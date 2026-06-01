@@ -1,4 +1,5 @@
 # Logs
+notes
 logs
 *.log
 npm-debug.log*
@@ -117,5 +118,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# End of https://mrkandreev.name/snippets/gitignore-generator/#Node
 .notes
+.notes/*

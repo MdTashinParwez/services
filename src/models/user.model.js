@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose ,{Schema} from 'mongoose';
 const bcrypt = require('bcryptjs');
 
 const userSchema = new Schema(
@@ -10,6 +10,7 @@ const userSchema = new Schema(
       maxlength: 50,
       lowercase: true,
       index: true,
+      unique: true,
     },
     email: {
       type: String,
@@ -54,12 +55,6 @@ const userSchema = new Schema(
 );
 
 
-//todo: add indexes for email and phone for faster lookups
-// // Index for geospatial queries
-// userSchema.index({ 'location.coordinates': '2dsphere' });
-// userSchema.index({ email: 1 });
-// userSchema.index({ phone: 1 });
-
 
 // Hashing password before saving
 userSchema.pre('save', async function (next) {
@@ -82,7 +77,7 @@ userSchema.methods.isPasswordCorrect = async function (enteredPassword) {
 };
 
 userSchema.methods.generateeAccessToken = function () {
-  jwt.sign(
+   jwt.sign(
     {
       id: this._id,
       email: this.email,
