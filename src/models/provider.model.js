@@ -78,7 +78,7 @@ const providerSchema = new Schema(
     },
     responseTime: {
       type: Number,
-      default: 0, // in hours
+      default: 0, 
     },
   },
     {
