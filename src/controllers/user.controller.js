@@ -1,6 +1,6 @@
 import asyncHandler from '../utils/asyncHandler.js';
-import apiError from '../utils/apiError.js';
-import User from '../models/user.model.js';
+import {apiError} from '../utils/apiError.js';
+import {User} from '../models/user.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
 import {ApiResponse} from '../utils/apiResponse.js';
 const registerUser = asyncHandler(async (req,res)=>{
@@ -8,22 +8,27 @@ const registerUser = asyncHandler(async (req,res)=>{
     // save user to database
     // return success response
    
-  const {username,email,password} = req.body;
+  const {username,email,password,phone} = req.body;
     
     // input validation
-    if( [username,email,password].some((field) => field?.trim() === "")){
+    if( [username,email,password,phone].some((field) => field?.trim() === "")){
         throw new apiError(400, "All fields are required")
     }
     if(password.length < 6){
         throw new apiError(400, "Password must be at least 6 characters long")
     }
-    if(!/^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]$/.test(email)){
+    if(!/\S+@\S+\.\S+/.test(email)){
         throw new apiError(400, "Invalid email format")
     }
 
      // check if user already exists
- const existingUser = await User.findOne({email});
-        if(existingUser){
+        const existingUser = await User.findOne({
+    $or: [
+        { email },
+        { username }
+            ]
+        })    
+            if(existingUser){
             throw new apiError(409, "User with this email already exists")
         }
 
@@ -44,14 +49,14 @@ const registerUser = asyncHandler(async (req,res)=>{
         avatar: avatar?.url || null,
         phone,
         isVerified: false,
-        // role will be assigned based on registration endpoint (e.g., /register/provider for providers)
+        // role will be assigned based user choice , all are default user 
     })
    const createdUser = await User.findById(user._id).select("-password -refreshToken")
    
    if(!createdUser){
     throw new apiError(500, "Failed to create user")
    }
-   return res.status(201).json(new ApiResponse(200,createdUser, "User registered successfully"))
+   return res.status(200).json(new ApiResponse(200,createdUser, "User registered successfully"))
 
 })
 
