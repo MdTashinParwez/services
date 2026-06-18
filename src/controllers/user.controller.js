@@ -20,13 +20,13 @@ const generateAccessAndRefreshTokens = async (userId) => {
         return { accessToken, refreshToken }
 
     } catch (error) {
-        console.log("TOKEN ERROR:", error);
-    throw new apiError(500, error.message);
+    //     console.log("TOKEN ERROR:", error);
+    // throw new apiError(500, error.message);
 
-        // throw new apiError(
-        //     500,
-        //     "Something went wrong while generating tokens"
-        // )
+        throw new apiError(
+            500,
+            "Something went wrong while generating tokens"
+        )
     }
 }
   
@@ -124,8 +124,7 @@ const loginUser = asyncHandler(async (req, res)=>{
     new ApiResponse(
         200,
         {
-            user: loggedInUser, accessToken,
-            refreshToken
+            user: loggedInUser, 
         },
         "user logged In Successfully"
     )
@@ -138,13 +137,34 @@ const loginUser = asyncHandler(async (req, res)=>{
 
 })
 
-const logouotUser = asyncHandler(async(req,res) =>{
-    
+const logoutUser = asyncHandler(async(req,res) =>{
+   await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set:{
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {
+    httpOnly: true,
+    secure: true,
+   }
+
+   return res
+   .status(200)
+   .clearCookie("accessToken", options)
+   .clearCookie("refreshToken", options)
+   .json(new ApiResponse(200,{},"User logged Out"))
 })
 
 export {
     registerUser,
     loginUser,
-    logouotUser
+    logoutUser
 }
 
