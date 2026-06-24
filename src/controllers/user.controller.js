@@ -6,6 +6,7 @@ import {ApiResponse} from '../utils/apiResponse.js';
 import jwt from "jsonwebtoken"
 
 
+
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
         const user = await User.findById(userId)
@@ -239,7 +240,7 @@ const getCurrentUser = asyncHandler(async(req,res)=>{
 
 })
 
-//todo add fullname to the project 
+//todo add username to the project 
 const updateProfileDetails = asyncHandler(async(res,req) =>{
   const {email,phone} = req.body 
 
@@ -284,6 +285,43 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
     ).select("-password")
    }
 })
+
+//this logic is used in future to manage the user an provdier
+// const getUserdetails = asyncHandler(async(req,res)=>{
+//  const {username} = req.params
+//  if(!username) = req.params
+  
+//  if(!username?.trim()){
+//   throw new apiError(400,"No user found")
+//  }
+
+// const channel =  User.aggregate([
+//     { $match: {
+//         username : username?.toLowerCase(),
+//       }
+//     },
+//     {
+//       $lookup:{
+//         from: "subcription",
+//         localField: "_id",
+//         foreignField: "channel",
+//         as: "subscribers"
+//       }
+//     },
+//     {$addFields: {
+//       subscribersCount:{
+//         $size: "$subscribers"
+//       },
+//       channelSubscribedToCount: {
+//         $size: "$subscribedTo"
+//       },
+      
+//     }
+
+//     }
+
+// ])
+// })
 
 export {
     registerUser,
