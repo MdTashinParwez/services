@@ -38,7 +38,7 @@ const registerUser = asyncHandler(async (req,res)=>{
   const {username,email,password,phone} = req.body;
     
     // input validation
-    if( [username,email,password,phone].some((field) => field?.trim() === "")){
+    if( [username,email,password,phone].some((field) => !field?.trim())){
         throw new apiError(400, "All fields are required")
     }
     if(password.length < 6){
@@ -52,7 +52,7 @@ const registerUser = asyncHandler(async (req,res)=>{
         const existingUser = await User.findOne({
     $or: [
         { email },
-        { username }
+        { username: username.toLowerCase() }
             ]
         })    
             if(existingUser){
@@ -61,12 +61,17 @@ const registerUser = asyncHandler(async (req,res)=>{
 
     // avatar handling
     
-   const avatarPath = req.files?.avatar?.[0]?.path || null;
+   const avatarPath = req.files?.avatar?.[0]?.path;
 
-   const avatar = await uploadOnCloudinary(avatarPath)
     if(!avatarPath){
         throw new apiError(400, "Avatar is required")
     }
+
+   const avatar = await uploadOnCloudinary(avatarPath)
+
+   if(!avatar?.url){
+    throw new apiError(500, "Avatar upload failed")
+   }
 
     // create user
   const user =  await User.create({
@@ -83,7 +88,7 @@ const registerUser = asyncHandler(async (req,res)=>{
    if(!createdUser){
     throw new apiError(500, "Failed to create user")
    }
-   return res.status(200).json(new ApiResponse(200,createdUser, "User registered successfully"))
+   return res.status(201).json(new ApiResponse(201,createdUser, "User registered successfully"))
 
 })
 
@@ -91,8 +96,8 @@ const loginUser = asyncHandler(async (req, res)=>{
 
    const {email,password,phone} = req.body
 
-   if(!email && !phone){
-      throw new apiError(400, "Email or phone is required")
+   if((!email && !phone) || !password){
+      throw new apiError(400, "Email/Phone and password are required")
    }
 
     const user = await  User.findOne({
@@ -171,7 +176,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       req.cookies?.refreshToken || req.body.refreshToken;
 
     if (!incomingRefreshToken) {
-      throw new ApiError(401, "Unauthorized request");
+      throw new apiError(401, "Unauthorized request");
     }
 
     const decodedToken = jwt.verify(
@@ -179,14 +184,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET
     );
 
-    const user = await User.findById(decodedToken._id);
+    const user = await User.findById(decodedToken.id).select("+refreshToken");
 
     if (!user) {
-      throw new ApiError(401, "Invalid refresh token");
+      throw new apiError(401, "Invalid refresh token");
     }
 
     if (incomingRefreshToken !== user.refreshToken) {
-      throw new ApiError(401, "Refresh token is expired or used");
+      throw new apiError(401, "Refresh token is expired or used");
     }
 
     const { accessToken, refreshToken: newRefreshToken } =
@@ -211,7 +216,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       );
 
   } catch (error) {
-    throw new ApiError(
+    throw new apiError(
       401,
       error?.message || "Invalid refresh token"
     );
@@ -220,13 +225,26 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async(req,res) =>{
   const {oldPassword, newPassword} = req.body
-  const user = await User.findById(req.user?._id)
+
+  if(!oldPassword || !newPassword){
+    throw new apiError(400,"Old password and new password are required")
+  }
+
+  if(oldPassword === newPassword){
+    throw new apiError(400,"New password cannot be same as old password")
+  }
+
+  if(newPassword.length < 6){
+    throw new apiError(400,"Password must be at least 6 characters long")
+  }
+
+  const user = await User.findById(req.user?._id).select("+password")
   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
   if(!isPasswordCorrect){
     throw new apiError(400,"Invalid old Password ")
   }
   user.password = newPassword
-  await user.save({validateBeforeSave: false})
+  await user.save()
 
   return res.status(200).json(new ApiResponse(200,{},"Password is updated"))
 
@@ -236,21 +254,31 @@ const changeCurrentPassword = asyncHandler(async(req,res) =>{
 const getCurrentUser = asyncHandler(async(req,res)=>{
   return res
   .status(200)
-  .json(200,req.user,"current user fetched successfully")
+  .json(new ApiResponse(200, req.user, "current user fetched successfully"))
 
 })
 
-//todo add username to the project 
-const updateProfileDetails = asyncHandler(async(res,req) =>{
-  const {email,phone} = req.body 
+const updateProfileDetails = asyncHandler(async(req,res) =>{
+  const {username, email, phone} = req.body 
 
-  if(!email || !phone){
+  if([username, email, phone].some((field) => !field?.trim())){
     throw new apiError(400, "All fields are required")
     }
-    User.findByIdAndUpdate(
+
+    const existingUser = await User.findOne({
+      _id: { $ne: req.user?._id },
+      $or: [{ email }, { username: username.toLowerCase() }]
+    })
+
+    if(existingUser){
+      throw new apiError(409, "User with this email or username already exists")
+    }
+
+    const user = await User.findByIdAndUpdate(
       req.user?._id,
       {
         $set:{
+          username: username.toLowerCase(),
           email: email,
           phone: phone
         }
@@ -267,14 +295,15 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
 
    if(!avatarLocalPath){
     throw new apiError(400, "Avatar file is missing")
+   }
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
 
-    if(!avatar.url){
+    if(!avatar?.url){
       throw new apiError(400,"Error while uploading on avatar ")
     }
 
-    await User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
       req.user?._id,
       {
         $set:{
@@ -283,7 +312,10 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
       },
       {new: true}
     ).select("-password")
-   }
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar updated successfully"))
 })
 
 //this logic is used in future to manage the user an provdier
@@ -333,4 +365,3 @@ export {
     updateProfileDetails,
     updateUserAvatar
 }
-

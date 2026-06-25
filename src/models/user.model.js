@@ -8,7 +8,7 @@ const userSchema = new Schema(
       type: String,
       required: [true, 'Please provide a username'],
       trim: true,
-      maxlength: 50,
+      maxlength: 8,
       lowercase: true,
       index: true,
       unique: true,
