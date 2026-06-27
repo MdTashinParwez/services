@@ -96,4 +96,17 @@ const providerUser = asyncHandler(async(req,res) =>{
       return res.status(201).json(new ApiResponse(201,{provider: createProvider, user: updatedUser}, "Provider created  successfully"))
 })
 
+const updateProviderDetail = asyncHandler(async (req,res) => {
+    const {businessName,businessDescription,
+    businessCategory} = req.body 
+
+    const existingProvider = await provider.findOne({
+        id: {$ne: req.user?._id},
+        $or:[{businessName}]
+    })
+    if(existingProvider){
+        throw new apiError(409,"Provider with this name is already exist")
+    }
+})
+
 export { providerUser }
