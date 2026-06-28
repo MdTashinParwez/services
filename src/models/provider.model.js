@@ -13,6 +13,7 @@ const providerSchema = new Schema(
       required: [true, 'Please provide a business name'],
       trim: true,
      unique: true,
+     index: true
 
     },
     businessDescription: {
