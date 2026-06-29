@@ -40,7 +40,7 @@ const providerUser = asyncHandler(async (req, res) => {
   if (existingProviderName) {
     throw new apiError(409, 'Provider with this name is already exists');
   }
-
+   // todo what if provider fail and 
   const documentPath = req.files?.documents?.[0]?.path;
   if (!documentPath) {
     throw new apiError(400, 'document {Aadher card } is required');
@@ -111,58 +111,100 @@ const providerUser = asyncHandler(async (req, res) => {
     );
 });
 
-const updateProviderDetail = asyncHandler(async (req, res) => {
-  //get current provider
-  // validate input
-  // check category input
-  // bussines name
-  // check duplickate
-  // updat
-  // return updated provider
-  const { businessName, businessDescription, businessCategory } = req.body;
+// const updateProviderDetail = asyncHandler(async (req, res) => {
+//   //get current provider
+//   // validate input
+//   // check category input
+//   // bussines name
+//   // check duplickate
+//   // updat
+//   // return updated provider
+//   const { businessName, businessDescription, businessCategory } = req.body;
 
+//   if (!req.user?._id) {
+//     throw new apiError(401, 'Unauthorized request');
+//   }
+//   if (!businessName?.trim() || !businessDescription?.trim() || !businessCategory) {
+//     throw new apiError(400, 'All fields are required');
+//   }
+
+//   if (!mongoose.isValidObjectId(businessCategory)) {
+//     throw new apiError(400, 'Invalid business category');
+//   }
+
+//   const category = await Category.findById(businessCategory);
+
+//   if (!category) {
+//     throw new apiError(404, 'Business category not found');
+//   }
+
+//   const category = await Category.findById(businessCategory);
+
+//   if (!category) {
+//     throw new apiError(404, 'Business category not found');
+//   }
+
+//   const existingProviderName = await Provider.findOne({
+//     $or: [{ businessName: businessName.toLowerCase() }],
+//   });
+
+//   if (existingProviderName) {
+//     throw new apiError(409, 'Provider with this name is already exists');
+//   }
+//   // checking complete
+//   const currentProvider = await Provider.findOne({
+//     user: provider._id,
+//   });
+//   const existingProvider = await Provider.findOne({
+//     id: { $ne: currentProvider._id },
+//     $or: [{ businessName }],
+//   });
+//   if (existingProvider) {
+//     throw new apiError(409, 'Provider with this name is already exist');
+//   }
+//   const provider = await Provider.findByIdAndUpdate(
+//     currentProvider._id,
+//     {
+//       $set: {
+//         businessName: busingessName.toLowerCase(), // also here check if name is already taken
+//         businessDescription: businessDescription,
+//         businessCategory, //: ( todo check the mongo if ther user category belong to the category or naot  )
+//       },
+//     },
+//     {
+//       new: true,
+//     }
+//   ).select('-password');
+//   return res.status(200).json(new ApiResponse(200, user, 'Account details updated successfully'));
+// });
+
+
+const updateProviderDetail = asyncHandler(async (req,res) => {
+
+  const { businessName, businessDescription, businessCategory } = req.body; 
+
+  if (
+  !businessName?.trim() ||
+  !businessDescription?.trim() ||
+  !businessCategory) {throw new apiError(400, 'All fields are required');}
+
+  // check category & businessName 
   if (!mongoose.isValidObjectId(businessCategory)) {
-    throw new apiError(400, 'Invalid business category');
-  }
+  throw new apiError(400, 'Invalid business category');}
 
   const category = await Category.findById(businessCategory);
-
   if (!category) {
-    throw new apiError(404, 'Business category not found');
-  }
+  throw new apiError(404, 'Business category not found');}
 
   const existingProviderName = await Provider.findOne({
+    _id: {$ne:req.user?._id},
     $or: [{ businessName: businessName.toLowerCase() }],
-  });
-
+  
   if (existingProviderName) {
-    throw new apiError(409, 'Provider with this name is already exists');
-  }
-
-  const currentProvider = await Provider.findOne({
-    user: provider._id,
-  });
-  const existingProvider = await Provider.findOne({
-    id: { $ne: currentProvider._id },
-    $or: [{ businessName }],
-  });
-  if (existingProvider) {
-    throw new apiError(409, 'Provider with this name is already exist');
-  }
-  const provider = await Provider.findByIdAndUpdate(
-    currentProvider._id,
-    {
-      $set: {
-        businessName: busingessName.toLowerCase(), // also here check if name is already taken
-        businessDescription: businessDescription,
-        businessCategory, //: ( todo check the mongo if ther user category belong to the category or naot  )
-      },
-    },
-    {
-      new: true,
-    }
-  ).select('-password');
-  return res.status(200).json(new ApiResponse(200, user, 'Account details updated successfully'));
+  throw new apiError(409, 'Provider with this name is already exists');}
+  )}
+}
 });
+
 
 export { providerUser };
