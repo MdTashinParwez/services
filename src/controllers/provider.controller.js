@@ -111,74 +111,6 @@ const providerUser = asyncHandler(async (req, res) => {
     );
 });
 
-// const updateProviderDetail = asyncHandler(async (req, res) => {
-//   //get current provider
-//   // validate input
-//   // check category input
-//   // bussines name
-//   // check duplickate
-//   // updat
-//   // return updated provider
-//   const { businessName, businessDescription, businessCategory } = req.body;
-
-//   if (!req.user?._id) {
-//     throw new apiError(401, 'Unauthorized request');
-//   }
-//   if (!businessName?.trim() || !businessDescription?.trim() || !businessCategory) {
-//     throw new apiError(400, 'All fields are required');
-//   }
-
-//   if (!mongoose.isValidObjectId(businessCategory)) {
-//     throw new apiError(400, 'Invalid business category');
-//   }
-
-//   const category = await Category.findById(businessCategory);
-
-//   if (!category) {
-//     throw new apiError(404, 'Business category not found');
-//   }
-
-//   const category = await Category.findById(businessCategory);
-
-//   if (!category) {
-//     throw new apiError(404, 'Business category not found');
-//   }
-
-//   const existingProviderName = await Provider.findOne({
-//     $or: [{ businessName: businessName.toLowerCase() }],
-//   });
-
-//   if (existingProviderName) {
-//     throw new apiError(409, 'Provider with this name is already exists');
-//   }
-//   // checking complete
-//   const currentProvider = await Provider.findOne({
-//     user: provider._id,
-//   });
-//   const existingProvider = await Provider.findOne({
-//     id: { $ne: currentProvider._id },
-//     $or: [{ businessName }],
-//   });
-//   if (existingProvider) {
-//     throw new apiError(409, 'Provider with this name is already exist');
-//   }
-//   const provider = await Provider.findByIdAndUpdate(
-//     currentProvider._id,
-//     {
-//       $set: {
-//         businessName: busingessName.toLowerCase(), // also here check if name is already taken
-//         businessDescription: businessDescription,
-//         businessCategory, //: ( todo check the mongo if ther user category belong to the category or naot  )
-//       },
-//     },
-//     {
-//       new: true,
-//     }
-//   ).select('-password');
-//   return res.status(200).json(new ApiResponse(200, user, 'Account details updated successfully'));
-// });
-
-
 const updateProviderDetail = asyncHandler(async (req,res) => {
 
   const { businessName, businessDescription, businessCategory } = req.body; 
@@ -196,15 +128,87 @@ const updateProviderDetail = asyncHandler(async (req,res) => {
   if (!category) {
   throw new apiError(404, 'Business category not found');}
 
+
+  const currentProvider = await Provider.findOne({
+    user:req.user._id 
+  });  
+  if(!currentProvider){
+   throw new apiError(404,"Provider not found")
+  }
   const existingProviderName = await Provider.findOne({
-    _id: {$ne:req.user?._id},
-    $or: [{ businessName: businessName.toLowerCase() }],
+     _id:{ $ne:currentProvider._id}, //p1
+     businessName: businessName.toLowerCase()
+  }) 
+  if(existingProviderName){
+    throw new apiError(409,"Provider with Bussiness Name already exists");
+  }
+
+  // update after validation 
+  const provider = await Provider.findByIdAndUpdate(currentProvider._id,
+    {
+      $set: {
+        businessName : businessName.toLowerCase(),
+        businessDescription: businessDescription,
+        businessCategory: businessCategory
+      }
+    },
+    {new: true}
+  )
+  return res
+  .status(200)
+  .json (new ApiResponse(200, provider,"Provider Detail updated "))
+
   
-  if (existingProviderName) {
-  throw new apiError(409, 'Provider with this name is already exists');}
-  )}
-}
 });
+ 
+const updateProviderDocument = asyncHandler(async (req,res) => {
+
+  const currentProvider = await Provider.findOne({
+    user:req.user._id 
+  })
+  if(!currentProvider){
+   throw new apiError(404,"Provider not found" )
+}
+  
+  const documentLocalPath = req.file?.path  
+
+  if(!documentLocalPath){
+        throw new apiError(400, "Document file is missing")
+}
+
+const uploadedDocument  = await uploadOnCloudinary(documentLocalPath)
+
+if(!uploadedDocument ?.url){
+  throw new apiError(400," Error while uploading document")
+}
+
+const provider = await Provider.findByIdAndUpdate(
+  currentProvider._id,
+  {
+    $set: {
+      documents: [
+            {
+              documentType: 'identity',
+              documentUrl: uploadedDocument.url,
+            },
+          ],
+    }
+  },{new:true}
+)
+ return res
+ .status(200)
+ .json(new ApiResponse(200,provider,"Document Updated Successfully"))
+})
 
 
-export { providerUser };
+
+// TODO:
+// Support multiple document uploads
+// Replace single-file multer config with upload.fields()
+// Add document type validation
+// Allow document replacement/removal
+export { 
+  providerUser,
+  updateProviderDetail,
+  updateProviderDocument,
+ };
