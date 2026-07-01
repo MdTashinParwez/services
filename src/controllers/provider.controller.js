@@ -116,8 +116,8 @@ const updateProviderDetail = asyncHandler(async (req,res) => {
   const { businessName, businessDescription, businessCategory } = req.body; 
 
   if (
-  !businessName?.trim() ||
-  !businessDescription?.trim() ||
+  !businessName&&
+  !businessDescription&&
   !businessCategory) {throw new apiError(400, 'All fields are required');}
 
   // check category & businessName 
@@ -159,7 +159,8 @@ const updateProviderDetail = asyncHandler(async (req,res) => {
   .json (new ApiResponse(200, provider,"Provider Detail updated "))
 
   
-});
+});   //  PATCH controllers should validate only the fields that are provided.
+//Do not force all fields to be present like a POST controller.
  
 const updateProviderDocument = asyncHandler(async (req,res) => {
   const currentProvider = await Provider.findOne({
