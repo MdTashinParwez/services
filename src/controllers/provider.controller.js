@@ -162,7 +162,6 @@ const updateProviderDetail = asyncHandler(async (req,res) => {
 });
  
 const updateProviderDocument = asyncHandler(async (req,res) => {
-
   const currentProvider = await Provider.findOne({
     user:req.user._id 
   })
@@ -200,7 +199,37 @@ const provider = await Provider.findByIdAndUpdate(
  .json(new ApiResponse(200,provider,"Document Updated Successfully"))
 })
 
+const getcurrentProvider = asyncHandler(async(req,res)=>{
+  const currentProvider = await Provider.findOne({
+    user: req.user._id
+  }).populate("businessCategory")
 
+  if(!currentProvider){
+    throw new apiError(404,"Provider not found")
+  }
+  return res
+  .status(200)
+  .json(new ApiResponse(200,currentProvider,"Current Provider"))
+
+})
+
+const getProviderById = asyncHandler(async (req,res) => {
+  const {id} = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, 'Invalid provider Id');
+  }
+
+  const provider = await Provider.findById(id).populate("businessCategory")
+  if(!provider){
+    throw new apiError(404,"Provider not found")
+  }
+  return res
+  .status(200)
+  .json(new ApiResponse(200,provider,"Provider fetched successfully"))
+
+
+})
 
 // TODO:
 // Support multiple document uploads
@@ -211,4 +240,6 @@ export {
   providerUser,
   updateProviderDetail,
   updateProviderDocument,
- };
+  getcurrentProvider,
+  getProviderById
+};
