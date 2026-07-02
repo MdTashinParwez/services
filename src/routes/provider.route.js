@@ -15,5 +15,6 @@ router.route("/profile").patch(verifyJWT,updateProviderDetail)
 router.route("/documents").patch(verifyJWT,upload.single("documents"),updateProviderDocument)
 router.route("/me").get(verifyJWT,getcurrentProvider)
 router.route("/:id").get(verifyJWT,getProviderById)
+router.route("/all").post(verifyJWT,getAllProviders)
 
 export default router

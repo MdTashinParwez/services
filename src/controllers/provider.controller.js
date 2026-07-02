@@ -230,17 +230,85 @@ const getProviderById = asyncHandler(async (req,res) => {
   .json(new ApiResponse(200,provider,"Provider fetched successfully"))
 
 
-})
+ }) 
+ //  Future Improvement:
+// Create separate public provider response.
+// Never expose documents, earnings, or internal provider data in public APIs.
+// Use .select() to whitelist fields returned to clients.
 
 // TODO:
 // Support multiple document uploads
 // Replace single-file multer config with upload.fields()
 // Add document type validation
 // Allow document replacement/removal
+
+
+
+const getAllProviders = asyncHandler(async(req,res)=>{
+
+      const page = Math.max(parseInt(req.query.page) || 1,1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+      const search = req.query.search || "";
+      const category = req.query.category;
+
+      const skip = (page-1) * limit;
+
+      const query = {
+        isApproved: true
+      };
+
+      if( category && !mongoose.isValidObjectId(category)){
+        throw new apiError(400,"Invalid category")
+      }
+      if(search){
+        query.businessName = {
+          $regex: search, 
+          $options: "i" 
+        };
+      }
+
+      if(category){
+        query.businessCategory = category;
+      }
+
+
+      const totalProviders = await Provider.countDocuments(query);
+
+      const providers = await Provider.find(query)
+      .populate("businessCategory")
+      .skip(skip)
+      .limit(limit)
+      .sort({createdAt: -1})
+      .select("businessName businessDescription businessCategory isVerified")
+
+      const totalPages = Math.ceil(totalProviders / limit);
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,{
+              providers,
+              currentPage: page,
+              totalPages,
+              totalProviders,
+          },
+           "Providers fetched successfully"
+        )
+      )
+
+  
+
+  
+})
+
+
+
+
+
 export { 
   providerUser,
   updateProviderDetail,
   updateProviderDocument,
   getcurrentProvider,
-  getProviderById
+  getProviderById,
+  getAllProviders
 };
