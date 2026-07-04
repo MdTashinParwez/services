@@ -43,8 +43,9 @@ const createService = asyncHandler(async (req, res) => {
   }
 
 
-   if (Number(price) <= 0) {
-    throw new apiError(400, "Price must be greater than 0");
+   const parsedPrice = Number(price);
+   if (isNaN(parsedPrice) || parsedPrice <= 0) {
+    throw new apiError(400, "Price is Invalid ");
   }
 
   if (Number(duration) <= 0) {
@@ -73,7 +74,7 @@ const createService = asyncHandler(async (req, res) => {
 
     imageUrls.push(uploadedImage.url);
   }
-
+  // TODO: trancation
    const service = await Service.create({
     provider: currentProvider._id,
     title: title.trim(),
@@ -110,3 +111,78 @@ const createService = asyncHandler(async (req, res) => {
 
  
 });
+
+const UpdateService = asyncHandler(async (req,res) => {
+  
+   const {
+    title,
+    description,
+    category,
+    price,
+    duration,
+    location,
+    serviceType,
+    tags,
+    customFields,
+  } = req.body;
+
+   if (!req.user?._id) {
+    throw new apiError(401, 'Unauthorized request');
+  }
+
+  const service = await Service.findById(id);
+
+  
+
+
+  if (!title?.trim() || !description?.trim() || !category || !price || !duration || location || serviceTYpe || tags || customFields)  {
+    throw new apiError(400, 'field are required');
+  }
+
+  
+  if (!mongoose.isValidObjectId(category)) {
+    throw new apiError(400, 'Invalid category id');
+  }
+
+  const categoryExists = await Category.findById(category);
+  if (!categoryExists) {
+    throw new apiError(404, 'Category not found');
+  }
+
+  const currentProvider = await Provider.findOne({ user: req.user._id });
+  if (!currentProvider) {
+    throw new apiError(404, 'Provider not found');
+  }
+
+
+   const parsedPrice = Number(price);
+   if (isNaN(parsedPrice) || parsedPrice <= 0) {
+    throw new apiError(400, "Price is Invalid ");
+  }
+
+  if (Number(duration) <= 0) {
+    throw new apiError(400, "Duration must be greater than 0");
+  }
+  const allowedTypes = ["online","onsite","hybrid"];
+
+  if(!allowedTypes.includes(serviceType)){
+        throw new apiError(400, "Invalid service type");
+    }
+    if ((serviceType === "onsite" || serviceType === "hybrid") &&!location ) {
+    throw new apiError( 400,
+      "Location is required for onsite and hybrid services"
+    );
+  }
+
+ const currentProvider = await Provider.findOne({
+    user:req.user._id 
+  });  
+
+
+
+
+})
+
+export{
+  createService
+}
