@@ -42,5 +42,71 @@ const createService = asyncHandler(async (req, res) => {
     throw new apiError(404, 'Provider not found');
   }
 
+
+   if (Number(price) <= 0) {
+    throw new apiError(400, "Price must be greater than 0");
+  }
+
+  if (Number(duration) <= 0) {
+    throw new apiError(400, "Duration must be greater than 0");
+  }
+  const allowedTypes = ["online","onsite","hybrid"];
+
+  if(!allowedTypes.includes(serviceType)){
+        throw new apiError(400, "Invalid service type");
+    }
+    if ((serviceType === "onsite" || serviceType === "hybrid") &&!location ) {
+    throw new apiError( 400,
+      "Location is required for onsite and hybrid services"
+    );
+  }
+
+  const imageFiles = req.files?.images || [];
+  const imageUrls = [];
+
+  for (const file of imageFiles) {
+    const uploadedImage = await uploadOnCloudinary(file.path);
+
+    if (!uploadedImage?.url) {
+      throw new apiError(500, "Image upload failed");
+    }
+
+    imageUrls.push(uploadedImage.url);
+  }
+
+   const service = await Service.create({
+    provider: currentProvider._id,
+    title: title.trim(),
+    description: description.trim(),
+    category,
+    price: Number(price),
+    duration: Number(duration),
+    serviceType,
+    location,
+    images: imageUrls,
+    tags: Array.isArray(tags)
+      ? tags.map((tag) => tag.trim().toLowerCase())
+      : [],
+    customFields,
+  })
+    await Category.findByIdAndUpdate(category, {
+    $inc: {
+      serviceCount: 1,
+    },
+  });
+
+  const createdService = await Service.findById(service._id)
+    .populate("provider", "businessName isVerified")
+    .populate("category", "name slug");
+
+  return res.status(201).json(
+    new ApiResponse(
+      201,
+      createdService,
+      "Service created successfully"
+    )
+  );
+
+
  
 });
