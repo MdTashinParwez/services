@@ -130,10 +130,23 @@ const UpdateService = asyncHandler(async (req,res) => {
     throw new apiError(401, 'Unauthorized request');
   }
 
-  const service = await Service.findById(id);
+  const {id} = req.params;
+  if(!mongoose.isValidObjectId(id)){
+    throw new apiError(402,"Invalid Id")
+  }
 
-  
+const service = await Service.findById(id); // yaha se id, provider, sab k access miljayga  us servic database m id se 
 
+ if(!service){
+      throw new apiError(402,"No Service found")
+ }
+
+ const currentProvider = await Provider.findById({
+  user: req.user._id,
+ })
+
+if( toString(service.provider) != toString(currentProvider._id)){
+throw new apiError(403, "You are not allowed to update this service");}
 
   if (!title?.trim() || !description?.trim() || !category || !price || !duration || location || serviceTYpe || tags || customFields)  {
     throw new apiError(400, 'field are required');
@@ -149,7 +162,7 @@ const UpdateService = asyncHandler(async (req,res) => {
     throw new apiError(404, 'Category not found');
   }
 
-  const currentProvider = await Provider.findOne({ user: req.user._id });
+  const currentProvider = await Provider.findById({ user: req.user._id });
   if (!currentProvider) {
     throw new apiError(404, 'Provider not found');
   }
