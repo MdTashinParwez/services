@@ -289,8 +289,172 @@ const service = await Service.findById(id); // yaha se id, provider, sab k acces
 
 })
 
+const getMyService = asyncHandler(async (req,res) => {
+
+  if(!req.user?._id){
+      throw new apiError(401, "Unauthorized request");
+  }
+
+  const currentProvider = await Provider.findOne({ user: req.user._id });
+  if (!currentProvider) {
+    throw new apiError(404, 'Provider not found');
+  }
+  const currentProviderService = await Service.find({
+    provider: currentProvider._id
+  }).populate("category","name slug")
+  .sort({   createdAt:-1 })
+  return res.status(200).json( 
+   new ApiResponse(
+    200,
+    currentProviderService,
+    "Services fetched successfully"
+)
+)
+
+})   // improvement pagination 
+
+const getServiceById = asyncHandler(async(req,res)=>{
+   const {id} = req.params
+
+   if(!mongoose.isValidObjectId(id)){
+    throw new apiError(400,"Invalid Service Id");
+   }
+  const service = await Service.findOne({
+    _id: id,
+    isActive: true
+  }).populate({
+    path: "provider",
+     match:{
+        isApproved:true,    // improve use aggrigaiton 
+    }
+    .populate("category","name sulg")
+  })
+
+  if(!service){
+        throw new apiError(404,"No Service Found");
+
+  }
+    if (!service.provider) {
+    throw new apiError(404, "Service not found");
+  }
+  return res.status(200).json(
+    new ApiResponse(200, service,"Service fetched successfully")
+  )
+  
+
+})
+
+const getAllServices = asyncHandler(async (req, res) => {
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+  const search = req.query.search || "";
+
+  const skip = (page - 1) * limit;
+
+  const query = {
+    isActive: true,
+  };
+
+  // Search by title or description
+  if (search) {
+    query.$or = [
+      {
+        title: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+      {
+        description: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+    ];
+  }
+
+  const totalServices = await Service.countDocuments(query);
+
+  const services = await Service.find(query)
+    .populate("provider", "businessName isVerified")
+    .populate("category", "name slug")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const totalPages = Math.ceil(totalServices / limit);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        services,
+        currentPage: page,
+        totalPages,
+        totalServices,
+      },
+      "Services fetched successfully"
+    )
+  );
+});
+
+const deleteService = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid service id");
+  }
+
+  const service = await Service.findById(id);
+
+  if (!service) {
+    throw new apiError(404, "Service not found");
+  }
+
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  if (service.provider.toString() !== currentProvider._id.toString()) {
+    throw new apiError(
+      403,
+      "You are not allowed to delete this service"
+    );
+  }
+
+  // Decrease category service count
+  await Category.findByIdAndUpdate(service.category, {
+    $inc: {
+      serviceCount: -1,
+    },
+  });
+
+  // Delete service
+  await service.deleteOne();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {},
+      "Service deleted successfully"
+    )
+  );
+});   // improvement sofDelete , MongoDB Transaction // image clean // bookin check
 
 
 export{
-  createService
+  createService,
+  updateService,
+  getMyService,
+  getServiceById,
+  getAllServices,
+  deleteService
 }
