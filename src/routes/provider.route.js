@@ -1,4 +1,4 @@
-import { getcurrentProvider,
+import { getAllProviders, getcurrentProvider,
      getProviderById, 
      providerUser,
       updateProviderDetail,
@@ -14,7 +14,7 @@ router.route("/").post(
 router.route("/profile").patch(verifyJWT,updateProviderDetail)
 router.route("/documents").patch(verifyJWT,upload.single("documents"),updateProviderDocument)
 router.route("/me").get(verifyJWT,getcurrentProvider)
+router.route("/all").get(verifyJWT,getAllProviders)
 router.route("/:id").get(verifyJWT,getProviderById)
-router.route("/all").post(verifyJWT,getAllProviders)
 
 export default router
