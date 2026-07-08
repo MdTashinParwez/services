@@ -37,14 +37,7 @@ const bookingSchema = new Schema(
     //     type: [Number], // [longitude, latitude]
     //   },
     // },
-    servicePrice: {
-      type: Number,
-      required: true,
-    },
-    totalAmount: {
-      type: Number,
-      required: true,
-    },
+   
     status: {
       type: String,
       enum: ['pending', 'accepted', 'in-progress', 'completed', 'cancelled'],
