@@ -23,11 +23,11 @@ const bookingSchema = new Schema(
       required: true,
     },
     startTime: {
-      type: String, // HH:MM format
+      type: Date, // HH:MM format
       required: true,
     },
     endTime: {
-      type: String, // HH:MM format
+      type: dispatchEvent, // HH:MM format
       required: true,
     },
     // location: {
