@@ -1,5 +1,7 @@
+import mongoose from 'mongoose';
 import { apiError } from '../utils/apiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import {booking} from "../models/booking.model.js"
 
 const createBooking = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
@@ -196,7 +198,119 @@ const getBookingById = asyncHandler(async (req, res) => {
 });
 
 const cancelBooking = asyncHandler(async (req,res) => {
-  
+  if(!req.user._id){
+    throw new apiError(400,"unauthorize reqest")
+  }
+  const { cancellationReason } = req.body;
+
+  const {id} = req.params
+
+  if(!mongoose.isValidObjectId(id)){
+        throw new apiError(400,"Invalid id")
+
+  }
+
+  // booking bussiness logic
+  const booking = await Booking.findById(id)
+
+  if(!booking){
+        throw new apiError(404, "Booking not found");
+
+  }
+  if(booking.customer.toString() !== req.user._id.toString()){
+    throw new apiError(403, "Access Denied");
+  }
+ if (booking.status === "completed") {
+    throw new apiError(400, "Completed booking cannot be cancelled");
+  }
+  if (booking.status === "cancelled") {
+    throw new apiError(400, "Booking is already cancelled");
+  }
+  if (booking.status === "in-progress") {
+    throw new apiError(400, "Booking is already in progress");
+  }
+
+  booking.status = "cancelled";
+  booking.cancelledBy  = "customer";
+  booking.cancellationReason = cancellationReason;
+ 
+  if (cancellationReason && cancellationReason.trim().length > 100){
+    throw new apiError(400,"Cancellation reason is too long");
+  }
+
+   await booking.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+        200,
+        booking,
+        "Booking cancelled successfully"
+    )
+);
+
 })
 
+const getProviderBookings = asyncHandler(async (req, res) => {
+
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+  const skip = (page - 1) * limit;
+
+  const { status } = req.query;
+
+  const query = {
+    provider: currentProvider._id,
+  };
+
+  if (status) {
+    const allowedStatus = [
+      "pending",
+      "accepted",
+      "in-progress",
+      "completed",
+      "cancelled",
+    ];
+
+    if (!allowedStatus.includes(status)) {
+      throw new apiError(400, "Invalid booking status");
+    }
+
+    query.status = status;
+  }
+
+  const totalBookings = await Booking.countDocuments(query);
+
+  const bookings = await Booking.find(query)
+    .populate("customer", "fullName email profileImage")
+    .populate("service", "title price images")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const totalPages = Math.ceil(totalBookings / limit);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        bookings,
+        currentPage: page,
+        totalPages,
+        totalBookings,
+      },
+      "Bookings fetched successfully"
+    )
+  );
+});
 

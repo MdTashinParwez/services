@@ -59,6 +59,15 @@ const bookingSchema = new Schema(
       enum: ['customer', 'provider', 'admin'],
     },
     cancellationReason: String,
+
+    cancellationRequested: {
+    type: Boolean,
+    default: false,
+    },
+    requestedBy: {
+    type: String,
+    enum:["customer","provider"]
+    },
     isReviewed: {
       type: Boolean,
       default: false,
