@@ -138,11 +138,6 @@ const loginUser = asyncHandler(async (req, res)=>{
     )
    )
 
-
-
-    
-
-
 })
 
 const logoutUser = asyncHandler(async(req,res) =>{
@@ -318,43 +313,6 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
     .status(200)
     .json(new ApiResponse(200, user, "Avatar updated successfully"))
 })
-
-//this logic is used in future to manage the user an provdier
-// const getUserdetails = asyncHandler(async(req,res)=>{
-//  const {username} = req.params
-//  if(!username) = req.params
-  
-//  if(!username?.trim()){
-//   throw new apiError(400,"No user found")
-//  }
-
-// const channel =  User.aggregate([
-//     { $match: {
-//         username : username?.toLowerCase(),
-//       }
-//     },
-//     {
-//       $lookup:{
-//         from: "subcription",
-//         localField: "_id",
-//         foreignField: "channel",
-//         as: "subscribers"
-//       }
-//     },
-//     {$addFields: {
-//       subscribersCount:{
-//         $size: "$subscribers"
-//       },
-//       channelSubscribedToCount: {
-//         $size: "$subscribedTo"
-//       },
-      
-//     }
-
-//     }
-
-// ])
-// })
 
 export {
     registerUser,

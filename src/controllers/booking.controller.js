@@ -314,3 +314,235 @@ const getProviderBookings = asyncHandler(async (req, res) => {
   );
 });
 
+
+const acceptBooking = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid booking id");
+  }
+
+  const booking = await Booking.findById(id);
+
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
+  }
+
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  if (booking.provider.toString() !== currentProvider._id.toString()) {
+    throw new apiError(
+      403,
+      "You are not allowed to accept this booking"
+    );
+  }
+
+  if (booking.status === "accepted") {
+    throw new apiError(400, "Booking is already accepted");
+  }
+
+  if (booking.status === "cancelled") {
+    throw new apiError(400, "Cancelled booking cannot be accepted");
+  }
+
+  if (booking.status === "completed") {
+    throw new apiError(400, "Completed booking cannot be accepted");
+  }
+
+  if (booking.status === "in-progress") {
+    throw new apiError(400, "Booking is already in progress");
+  }
+
+  booking.status = "accepted";
+
+  await booking.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      booking,
+      "Booking accepted successfully"
+    )
+  );
+});
+
+const rejectBooking = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { rejectionReason } = req.body;
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid booking id");
+  }
+
+  const booking = await Booking.findById(id);
+
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
+  }
+
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  if (booking.provider.toString() !== currentProvider._id.toString()) {
+    throw new apiError(
+      403,
+      "You are not allowed to reject this booking"
+    );
+  }
+
+  if (booking.status === "accepted") {
+    throw new apiError(
+      400,
+      "Accepted booking cannot be rejected. Please cancel it instead."
+    );
+  }
+
+  if (booking.status === "cancelled") {
+    throw new apiError(400, "Booking is already cancelled");
+  }
+
+  if (booking.status === "completed") {
+    throw new apiError(400, "Completed booking cannot be rejected");
+  }
+
+  if (booking.status === "in-progress") {
+    throw new apiError(400, "Booking is already in progress");
+  }
+
+  booking.status = "cancelled";
+  booking.cancelledBy = "provider";
+  booking.cancellationReason = rejectionReason;
+
+  await booking.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      booking,
+      "Booking rejected successfully"
+    )
+  );
+});
+
+const startBooking = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid booking id");
+  }
+
+  const booking = await Booking.findById(id);
+
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
+  }
+
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  if (booking.provider.toString() !== currentProvider._id.toString()) {
+    throw new apiError(
+      403,
+      "You are not allowed to start this booking"
+    );
+  }
+
+  if (booking.status !== "accepted") {
+    throw new apiError(
+      400,
+      "Only accepted bookings can be started"
+    );
+  }
+
+  booking.status = "in-progress";
+
+  await booking.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      booking,
+      "Booking started successfully"
+    )
+  );
+});
+
+const completeBooking = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid booking id");
+  }
+
+  const booking = await Booking.findById(id);
+
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
+  }
+
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  if (booking.provider.toString() !== currentProvider._id.toString()) {
+    throw new apiError(
+      403,
+      "You are not allowed to complete this booking"
+    );
+  }
+
+  if (booking.status !== "in-progress") {
+    throw new apiError(
+      400,
+      "Only in-progress bookings can be completed"
+    );
+  }
+
+  booking.status = "completed";
+
+  await booking.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      booking,
+      "Booking completed successfully"
+    )
+  );
+});
