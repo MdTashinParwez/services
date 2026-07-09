@@ -99,7 +99,7 @@ const createBooking = asyncHandler(async (req, res) => {
         totalAmount,
         customerNotes
     })
-    const createdBooking = await Booking.findById(booking._id).populate("service", "title price")
+  const createdBooking = await Booking.findById(booking._id).populate("service", "title price")
   .populate("provider", "businessName isVerified")
   .populate("customer", "fullName email");
 
@@ -111,8 +111,6 @@ const createBooking = asyncHandler(async (req, res) => {
     bookingCount: 1,
   },
   });
-
-
 
  return res.status(201).json(
     new ApiResponse(
@@ -126,4 +124,79 @@ const createBooking = asyncHandler(async (req, res) => {
 
 
 });  //future: tranction 
+
+const getMyBookings = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+  const skip = (page - 1) * limit;
+
+  const totalBookings = await Booking.countDocuments({
+    customer: req.user._id,
+  });
+
+  const bookings = await Booking.find({
+    customer: req.user._id,
+  })
+    .populate("service", "title price")
+    .populate("provider", "businessName isVerified")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        bookings,
+        currentPage: page,
+        totalPages: Math.ceil(totalBookings / limit),
+        totalBookings,
+      },
+      "Bookings fetched successfully"
+    )
+  );
+});
+
+const getBookingById = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid booking id");
+  }
+
+  const booking = await Booking.findById(id)
+    .populate("service", "title description price")
+    .populate("provider", "businessName isVerified")
+    .populate("customer", "fullName email");
+
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
+  }
+
+  // Customer can only access their own booking
+  if (booking.customer.toString() !== req.user._id.toString()) {
+    throw new apiError(403, "Access denied");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      booking,
+      "Booking fetched successfully"
+    )
+  );
+});
+
+const cancelBooking = asyncHandler(async (req,res) => {
+  
+})
+
 
