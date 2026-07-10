@@ -45,6 +45,12 @@ const reviewSchema = new Schema(
       communication: Number,
       punctuality: Number,
     },
+    isEdited: {
+    type: Boolean,
+    default: false,
+    },
+    editedAt: Date,
+    
     isHelpful: {
       type: Number,
       default: 0,
