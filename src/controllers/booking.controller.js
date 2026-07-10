@@ -1,7 +1,12 @@
-import mongoose from 'mongoose';
+import {Booking} from "../models/booking.model.js"
+import mongoose, { mongo } from 'mongoose';
+import { Provider } from '../models/provider.model.js';
+import { User } from '../models/user.model.js';
+import { Category } from '../models/category.model.js';
 import { apiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import {booking} from "../models/booking.model.js"
+import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
 const createBooking = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
@@ -106,7 +111,7 @@ const createBooking = asyncHandler(async (req, res) => {
   .populate("customer", "fullName email");
 
   if(!createdBooking){
-    throw new apiError(400,"Booking faild");
+    throw new apiError(400,"Booking failed");
   }
     await Service.findByIdAndUpdate(service._id, {
   $inc: {
@@ -232,6 +237,9 @@ const cancelBooking = asyncHandler(async (req,res) => {
 
   booking.status = "cancelled";
   booking.cancelledBy  = "customer";
+   if (cancellationReason && cancellationReason.trim().length > 100){
+    throw new apiError(400,"Cancellation reason is too long");
+  }
   booking.cancellationReason = cancellationReason;
  
   if (cancellationReason && cancellationReason.trim().length > 100){
@@ -430,6 +438,9 @@ const rejectBooking = asyncHandler(async (req, res) => {
 
   booking.status = "cancelled";
   booking.cancelledBy = "provider";
+   if (rejectionReason && rejectionReason.trim().length > 100){
+    throw new apiError(400,"Cancellation reason is too long");
+  }
   booking.cancellationReason = rejectionReason;
 
   await booking.save();
@@ -546,3 +557,15 @@ const completeBooking = asyncHandler(async (req, res) => {
     )
   );
 });
+
+export{
+  createBooking,
+  getMyBookings,
+  getBookingById,
+  cancelBooking,
+  getProviderBookings,
+  acceptBooking,
+  rejectBooking,
+  startBooking,
+  completeBooking,
+}
