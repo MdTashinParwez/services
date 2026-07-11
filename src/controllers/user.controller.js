@@ -246,7 +246,6 @@ const changeCurrentPassword = asyncHandler(async(req,res) =>{
 
 })
 
-// todo no code here Update
 const getCurrentUser = asyncHandler(async(req,res)=>{
   return res
   .status(200)
