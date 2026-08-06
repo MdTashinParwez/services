@@ -16,7 +16,7 @@ app.use(cookieParser());
 
 // Routes
 import userRouter from "./routes/user.routes.js";
-import providerRouter from "./routes/provider.route.js"
+import providerRouter from "./routes/provider.routes.js"
 
 // define routes
 app.use("/api/v1/users", userRouter);

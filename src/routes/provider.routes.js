@@ -1,8 +1,5 @@
-import { getAllProviders, getcurrentProvider,
-     getProviderById, 
-     providerUser,
-      updateProviderDetail,
-       updateProviderDocument } from "../controllers/provider.controller.js"
+import { getAllProviders, getcurrentProvider,getProviderById,providerUser,updateProviderDetail,
+updateProviderDocument } from "../controllers/provider.controller.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
 import { upload } from "../middlewares/multer.middleware.js"
 import {Router} from 'express';
