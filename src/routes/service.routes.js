@@ -22,7 +22,7 @@ router.route("/")
   ]),createService
 );
 
-router.route("/").get(getAllServices);
+router.route("/all").get(getAllServices)
 
 router.route("/my-services").get( verifyJWT, getMyService);
 

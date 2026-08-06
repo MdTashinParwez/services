@@ -41,6 +41,15 @@ const createService = asyncHandler(async (req, res) => {
   if (!currentProvider) {
     throw new apiError(404, 'Provider not found');
   }
+  
+  // turn on after v2
+  
+//   if (!currentProvider.isApproved) {
+//   throw new apiError(
+//     403,
+//     "Your provider account is pending approval. You cannot create services yet."
+//   );
+// }
 
 
    const parsedPrice = Number(price);
@@ -112,7 +121,7 @@ const createService = asyncHandler(async (req, res) => {
  
 });
 
-const UpdateService = asyncHandler(async (req,res) => {
+const updateService = asyncHandler(async (req,res) => {
   
    const {
     title,
@@ -327,15 +336,15 @@ const getServiceById = asyncHandler(async(req,res)=>{
      match:{
         isApproved:true,    // improve use aggrigaiton 
     }
-    .populate("category","name sulg")
-  })
+  }).populate("category","name sulg")
+
 
   if(!service){
         throw new apiError(404,"No Service Found");
 
   }
     if (!service.provider) {
-    throw new apiError(404, "Service not found");
+    throw new apiError(404, "Provider is not approved");
   }
   return res.status(200).json(
     new ApiResponse(200, service,"Service fetched successfully")
