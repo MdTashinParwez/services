@@ -27,7 +27,7 @@ const bookingSchema = new Schema(
       required: true,
     },
     endTime: {
-      type: dispatchEvent, // HH:MM format
+      type: Date, // HH:MM format
       required: true,
     },
     // location: {
