@@ -7,6 +7,7 @@ import { apiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { Service } from "../models/service.model.js";
 
 const createBooking = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
@@ -44,12 +45,14 @@ const createBooking = asyncHandler(async (req, res) => {
 
   const provider =  await Provider.findById(service.provider) 
 
+  
+ 
   if(!provider){
      throw new apiError(404, "provider is not exits");
   }
-  if (!provider.isActive) {
-  throw new apiError(400, "Provider is not active");
-}
+//   if (!provider.isActive) {
+//   throw new apiError(400, "Provider is not active");
+// }
   if(!provider.isApproved){
      throw new apiError(403, "provider is not approved");
   }
@@ -58,37 +61,81 @@ const createBooking = asyncHandler(async (req, res) => {
     throw new apiError(403, "You can not book your own service");
   }
   
+
+  
+
+
   //  booking option
-  const bookingStart = new Date(startTime);
-  const bookingEnd = new Date(endTime);
+  // const bookingStart = new Date(startTime);
+  // const bookingEnd = new Date(endTime);
+  // const bookingDay = new Date(bookingDate);
+
+  //   if (isNaN(bookingDay.getTime())) {
+  //       throw new apiError(400, "Invalid booking date");
+  //   }
+
+  //   if (bookingStart >= bookingEnd) {
+  //   throw new apiError(400, "End time must be after start time");
+  //   }
+  //   if (bookingStart < new Date()) {
+  //   throw new apiError(400, "Booking time cannot be in the past");
+  //   }
+
+  //   const existingBooking = await Booking.findOne({
+  //   service: service._id,
+  //   status: {
+  //       $in: ["pending", "accepted", "in-progress"],
+  //   },
+  //   startTime: {
+  //       $lt: bookingEnd,
+  //   },
+  //   endTime: {
+  //       $gt: bookingStart,
+  //   },
+  //   });
+  //   if (existingBooking) {
+  //   throw new apiError(400, "Selected time slot is already booked");
+  //   }
+
+
   const bookingDay = new Date(bookingDate);
-
-    if (isNaN(bookingDay.getTime())) {
-        throw new apiError(400, "Invalid booking date");
+  if(isNaN(bookingDay.getTime())){
+    throw new apiError(400, "Invalid booking date");
+  }
+  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+  throw new apiError(400, "Time must be in HH:MM format");
     }
+  const bookingStart = new Date(bookingDay);
+  const bookingEnd = new Date(bookingDay);
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
 
-    if (bookingStart >= bookingEnd) {
+  bookingStart.setHours(startHour, startMinute, 0, 0);
+  bookingEnd.setHours(endHour, endMinute, 0, 0);
+
+  if (bookingStart >= bookingEnd) {
     throw new apiError(400, "End time must be after start time");
-    }
-    if (bookingStart < new Date()) {
-    throw new apiError(400, "Booking time cannot be in the past");
-    }
+  }
 
+  if (bookingStart < new Date()) {
+    throw new apiError(400, "Booking time cannot be in the past");
+  }
     const existingBooking = await Booking.findOne({
-    service: service._id,
-    status: {
-        $in: ["pending", "accepted", "in-progress"],
-    },
-    startTime: {
-        $lt: bookingEnd,
-    },
-    endTime: {
-        $gt: bookingStart,
-    },
-    });
-    if (existingBooking) {
-    throw new apiError(400, "Selected time slot is already booked");
-    }
+      service: service._id,
+      status: {
+          $in: ["pending", "accepted", "in-progress"],
+      },
+      startTime: {
+          $lt: bookingEnd,
+      },
+      endTime: {
+          $gt: bookingStart,
+      },
+      });
+      if (existingBooking) {
+      throw new apiError(400, "Selected time slot is already booked");
+      }
 
 
     const servicePrice = service.price;
@@ -99,9 +146,9 @@ const createBooking = asyncHandler(async (req, res) => {
         customer: req.user._id,
         service: service._id,
         provider:provider._id,
-        bookingDate,
-        startTime,
-        endTime,
+        bookingDate: bookingDay,
+        startTime: bookingStart,
+        endTime: bookingEnd,
         servicePrice,
         totalAmount,
         customerNotes
