@@ -69,6 +69,7 @@ const createPayment = asyncHandler(async (req,res) => {
       "A pending payment already exists for this booking"
     );
   }
+
    const payment = await Payment.create({
     booking: booking._id,
     customer: booking.customer,
@@ -104,11 +105,12 @@ const paymentSuccess = asyncHandler(async (req, res) => {
   }
 
   const { id } = req.params;
-  const { transactionId } = req.body;
+  const { transactionId } = req.body || {};
 
   if (!mongoose.isValidObjectId(id)) {
     throw new apiError(400, "Invalid payment id");
   }
+  
 
   const payment = await Payment.findById(id);
 
@@ -234,7 +236,7 @@ const getPaymentById = asyncHandler(async (req, res) => {
     throw new apiError(404, "Payment not found");
   }
 
-  if (payment.customer.toString() !== req.user._id.toString()) {
+  if (payment.customer._id.toString() !== req.user._id.toString()) {
     throw new apiError(
       403,
       "You are not allowed to access this payment"

@@ -22,6 +22,18 @@ const bookingSchema = new Schema(
       type: Date,
       required: true,
     },
+     servicePrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    totalAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
     startTime: {
       type: Date, // HH:MM format
       required: true,
