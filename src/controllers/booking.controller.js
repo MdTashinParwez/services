@@ -235,8 +235,9 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new apiError(404, "Booking not found");
   }
 
+
   // Customer can only access their own booking
-  if (booking.customer.toString() !== req.user._id.toString()) {
+  if (booking.customer._id.toString() !== req.user._id.toString()) {
     throw new apiError(403, "Access denied");
   }
 
@@ -253,7 +254,7 @@ const cancelBooking = asyncHandler(async (req,res) => {
   if(!req.user._id){
     throw new apiError(400,"unauthorize reqest")
   }
-  const { cancellationReason } = req.body;
+  const { cancellationReason } = req.body || {};
 
   const {id} = req.params
 
@@ -264,11 +265,13 @@ const cancelBooking = asyncHandler(async (req,res) => {
 
   // booking bussiness logic
   const booking = await Booking.findById(id)
+  
 
   if(!booking){
         throw new apiError(404, "Booking not found");
 
   }
+  
   if(booking.customer.toString() !== req.user._id.toString()){
     throw new apiError(403, "Access Denied");
   }
@@ -284,14 +287,13 @@ const cancelBooking = asyncHandler(async (req,res) => {
 
   booking.status = "cancelled";
   booking.cancelledBy  = "customer";
+
    if (cancellationReason && cancellationReason.trim().length > 100){
     throw new apiError(400,"Cancellation reason is too long");
-  }
+   }
   booking.cancellationReason = cancellationReason;
  
-  if (cancellationReason && cancellationReason.trim().length > 100){
-    throw new apiError(400,"Cancellation reason is too long");
-  }
+  
 
    await booking.save();
 
@@ -436,7 +438,7 @@ const rejectBooking = asyncHandler(async (req, res) => {
     throw new apiError(401, "Unauthorized request");
   }
 
-  const { rejectionReason } = req.body;
+  const { rejectionReason } = req.body || {};
   const { id } = req.params;
 
   if (!mongoose.isValidObjectId(id)) {

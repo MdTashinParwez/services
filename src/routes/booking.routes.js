@@ -22,12 +22,6 @@ router.route("/")
 router.route("/my-bookings")
   .get(verifyJWT, getMyBookings);
 
-router.route("/:id")
-  .get(verifyJWT, getBookingById);
-
-router.route("/:id/cancel")
-  .patch(verifyJWT, cancelBooking);
-
 // Provider Routes
 router.route("/provider")
   .get(verifyJWT, getProviderBookings);
@@ -44,4 +38,16 @@ router.route("/:id/start")
 router.route("/:id/complete")
   .patch(verifyJWT, completeBooking);
 
+// Customer cancel
+router.route("/:id/cancel")  
+  .patch(verifyJWT, cancelBooking);
+
+// dynamic route
+router.route("/:id")
+  .get(verifyJWT, getBookingById);
+
+
+
+
 export default router;
+// 
