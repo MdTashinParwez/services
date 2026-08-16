@@ -221,7 +221,9 @@ const getProviderById = asyncHandler(async (req,res) => {
     throw new apiError(400, 'Invalid provider Id');
   }
 
-  const provider = await Provider.findById(id).populate("businessCategory")
+  const provider = await Provider.findById(id).populate("businessCategory").select(
+    "businessName businessDescription businessCategory isVerified averageRating totalReviews responseTime"
+  );
   if(!provider){
     throw new apiError(404,"Provider not found")
   }
