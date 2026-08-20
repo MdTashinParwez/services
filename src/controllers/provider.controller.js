@@ -302,6 +302,31 @@ const getAllProviders = asyncHandler(async(req,res)=>{
   
 })
 
+const getProviderStatus = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const provider = await Provider.findOne({
+    user: req.user._id,
+  }).select(
+    "businessName businessCategory isVerified isApproved createdAt"
+  );
+
+  if (!provider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        provider,
+      },
+      "Provider status fetched successfully"
+    )
+  );
+});
 
 
 
@@ -312,5 +337,6 @@ export {
   updateProviderDocument,
   getcurrentProvider,
   getProviderById,
-  getAllProviders
+  getAllProviders,
+  getProviderStatus,
 };

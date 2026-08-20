@@ -1,4 +1,4 @@
-import { getAllProviders, getcurrentProvider,getProviderById,providerUser,updateProviderDetail,
+import { getAllProviders, getcurrentProvider,getProviderById,getProviderStatus,providerUser,updateProviderDetail,
 updateProviderDocument } from "../controllers/provider.controller.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
 import { upload } from "../middlewares/multer.middleware.js"
@@ -13,5 +13,5 @@ router.route("/documents").patch(verifyJWT,upload.single("documents"),updateProv
 router.route("/me").get(verifyJWT,getcurrentProvider)
 router.route("/all").get(verifyJWT,getAllProviders)
 router.route("/:id").get(verifyJWT,getProviderById)
-
+router.get("/status", verifyJWT, getProviderStatus);
 export default router
