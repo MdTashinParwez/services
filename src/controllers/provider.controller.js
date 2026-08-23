@@ -54,7 +54,6 @@ const providerUser = asyncHandler(async (req, res) => {
 
   const session = await mongoose.startSession();
   let provider;
-  let updatedUser;
   try {
     session.startTransaction();
     [provider] = await Provider.create(
@@ -78,15 +77,6 @@ const providerUser = asyncHandler(async (req, res) => {
       { session }
     );
 
-    updatedUser = await User.findByIdAndUpdate(
-      req.user._id,
-      {
-        $set: {
-          role: 'provider',
-        },
-      },
-      { new: true, session }
-    ).select('-password -refreshToken');
     await session.commitTransaction();
   } catch (error) {
     await session.abortTransaction();
@@ -105,8 +95,8 @@ const providerUser = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         201,
-        { provider: populatedProvider, user: updatedUser },
-        'Provider created  successfully'
+        { provider: populatedProvider, },
+         "Provider application submitted successfully"
       )
     );
 });

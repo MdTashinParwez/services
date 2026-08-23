@@ -235,11 +235,30 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new apiError(404, "Booking not found");
   }
 
+ 
+const userId = req.user._id.toString();
 
-  // Customer can only access their own booking
-  if (booking.customer._id.toString() !== req.user._id.toString()) {
-    throw new apiError(403, "Access denied");
+const isCustomer = booking.customer._id.toString() === userId;
+
+let isProvider = false;
+
+if (req.user.role === "provider") {
+  const provider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (
+    provider &&
+    booking.provider._id.toString() === provider._id.toString()
+  ) {
+    isProvider = true;
   }
+}
+
+if (!isCustomer && !isProvider) {
+  throw new apiError(403, "Access denied");
+}
+
 
   return res.status(200).json(
     new ApiResponse(
@@ -349,7 +368,7 @@ const getProviderBookings = asyncHandler(async (req, res) => {
   const totalBookings = await Booking.countDocuments(query);
 
   const bookings = await Booking.find(query)
-    .populate("customer", "fullName email profileImage")
+    .populate("customer", "username email avatar")
     .populate("service", "title price images")
     .sort({ createdAt: -1 })
     .skip(skip)
