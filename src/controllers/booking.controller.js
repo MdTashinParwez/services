@@ -165,6 +165,11 @@ const createBooking = asyncHandler(async (req, res) => {
     bookingCount: 1,
   },
   });
+  await Provider.findByIdAndUpdate(provider._id, {
+  $inc: {
+    totalBookings: 1,
+  },
+});
 
  return res.status(201).json(
     new ApiResponse(
@@ -616,6 +621,11 @@ const completeBooking = asyncHandler(async (req, res) => {
   booking.status = "completed";
 
   await booking.save();
+   currentProvider.completedBookings += 1;
+  currentProvider.totalEarnings += booking.totalAmount;
+
+  await currentProvider.save();
+ 
 
   return res.status(200).json(
     new ApiResponse(
