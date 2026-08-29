@@ -7,6 +7,7 @@ import { ApiResponse } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
+
 const providerUser = asyncHandler(async (req, res) => {
   const { businessName, businessDescription, businessCategory } = req.body;
 
@@ -101,55 +102,98 @@ const providerUser = asyncHandler(async (req, res) => {
     );
 });
 
-const updateProviderDetail = asyncHandler(async (req,res) => {
 
-  const { businessName, businessDescription, businessCategory } = req.body; 
+const updateProviderDetail = asyncHandler(async (req, res) => {
+  const { businessName, businessDescription, businessCategory } = req.body;
 
   if (
-  !businessName&&
-  !businessDescription&&
-  !businessCategory) {throw new apiError(400, 'All fields are required');}
-
-  // check category & businessName 
-  if (!mongoose.isValidObjectId(businessCategory)) {
-  throw new apiError(400, 'Invalid business category');}
-
-  const category = await Category.findById(businessCategory);
-  if (!category) {
-  throw new apiError(404, 'Business category not found');}
-
+    businessName === undefined &&
+    businessDescription === undefined &&
+    businessCategory === undefined
+  ) {
+    throw new apiError(400, "At least one field is required");
+  }
 
   const currentProvider = await Provider.findOne({
-    user:req.user._id 
-  });  
-  if(!currentProvider){
-   throw new apiError(404,"Provider not found")
-  }
-  const existingProviderName = await Provider.findOne({
-     _id:{ $ne:currentProvider._id}, //p1
-     businessName: businessName.toLowerCase()
-  }) 
-  if(existingProviderName){
-    throw new apiError(409,"Provider with Bussiness Name already exists");
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "Provider not found");
   }
 
-  // update after validation 
-  const provider = await Provider.findByIdAndUpdate(currentProvider._id,
+  const updateFields = {};
+
+  // Business name
+  if (businessName !== undefined) {
+    if (!businessName.trim()) {
+      throw new apiError(400, "Business name cannot be empty");
+    }
+
+    const normalizedBusinessName = businessName.trim().toLowerCase();
+
+    const existingProviderName = await Provider.findOne({
+      _id: { $ne: currentProvider._id },
+      businessName: normalizedBusinessName,
+    });
+
+    if (existingProviderName) {
+      throw new apiError(
+        409,
+        "Provider with this business name already exists"
+      );
+    }
+
+    updateFields.businessName = normalizedBusinessName;
+  }
+
+  // Business description
+  if (businessDescription !== undefined) {
+    if (!businessDescription.trim()) {
+      throw new apiError(400, "Business description cannot be empty");
+    }
+
+    updateFields.businessDescription = businessDescription.trim();
+  }
+
+  // Business category
+  if (businessCategory !== undefined) {
+    if (!mongoose.isValidObjectId(businessCategory)) {
+      throw new apiError(400, "Invalid business category");
+    }
+
+    const category = await Category.findById(businessCategory);
+
+    if (!category) {
+      throw new apiError(404, "Business category not found");
+    }
+
+    updateFields.businessCategory = businessCategory;
+  }
+
+  const provider = await Provider.findByIdAndUpdate(
+    currentProvider._id,
     {
-      $set: {
-        businessName : businessName.toLowerCase(),
-        businessDescription: businessDescription,
-        businessCategory: businessCategory
-      }
+      $set: updateFields,
     },
-    {new: true}
-  )
-  return res
-  .status(200)
-  .json (new ApiResponse(200, provider,"Provider Detail updated "))
+    {
+      new: true,
+      runValidators: true,
+    }
+  ).populate("businessCategory");
 
-  
-});   //  PATCH controllers should validate only the fields that are provided.
+  if (!provider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      provider,
+      "Provider details updated successfully"
+    )
+  );
+});  //  PATCH controllers should validate only the fields that are provided.
 //Do not force all fields to be present like a POST controller.
  
 const updateProviderDocument = asyncHandler(async (req,res) => {
