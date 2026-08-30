@@ -103,6 +103,33 @@ const markAsRead = asyncHandler(async (req, res) => {
     )
   );
 });
+const markAllAsRead = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const result = await Notification.updateMany(
+    {
+      receiver: req.user._id,
+      isRead: false,
+    },
+    {
+      $set: {
+        isRead: true,
+      },
+    }
+  );
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        modifiedCount: result.modifiedCount,
+      },
+      "All notifications marked as read"
+    )
+  );
+});
 
 // no need to delete iff email
 // const deleteNotification = asyncHandler(async (req, res) => {
@@ -141,5 +168,6 @@ export {
   getMyNotifications,
   getNotificationById,
   markAsRead,
+  markAllAsRead
 //   deleteNotification,
 };

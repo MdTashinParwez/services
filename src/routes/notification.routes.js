@@ -4,7 +4,7 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
   getMyNotifications,
   getNotificationById,
-  markAsRead,
+  markAsRead,markAllAsRead,
   // deleteNotification,
 } from "../controllers/notification.controller.js";
 
@@ -19,5 +19,6 @@ router.route("/:id")
 
 router.route("/:id/read")
 .patch(verifyJWT, markAsRead);
+router.patch("/read-all", verifyJWT, markAllAsRead);
 
 export default router;
