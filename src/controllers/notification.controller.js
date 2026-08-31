@@ -1,4 +1,8 @@
-
+import mongoose from "mongoose";
+import asyncHandler from "../utils/asyncHandler.js";
+import { apiError } from "../utils/apiError.js";
+import { ApiResponse } from "../utils/apiResponse.js";
+import { Notification } from "../models/notification.model.js";
 
 const getMyNotifications = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
@@ -16,7 +20,7 @@ const getMyNotifications = asyncHandler(async (req, res) => {
   const notifications = await Notification.find({
     receiver: req.user._id,
   })
-    .populate("sender", "fullName profileImage")
+    .populate("sender", "username avatar")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -47,7 +51,7 @@ const getNotificationById = asyncHandler(async (req, res) => {
   }
 
   const notification = await Notification.findById(id)
-    .populate("sender", "fullName profileImage");
+    .populate("sender", "username avatar");
 
   if (!notification) {
     throw new apiError(404, "Notification not found");
