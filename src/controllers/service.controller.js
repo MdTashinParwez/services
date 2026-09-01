@@ -24,14 +24,6 @@ const createService = asyncHandler(async (req, res) => {
     throw new apiError(401, 'Unauthorized request');
   }
 
-  if (!title?.trim() || !description?.trim() || !category || !price || !duration) {
-    throw new apiError(400, 'Title, description, category, price, and duration are required');
-  }
-
-  if (!mongoose.isValidObjectId(category)) {
-    throw new apiError(400, 'Invalid category id');
-  }
-
   const categoryExists = await Category.findById(category);
   if (!categoryExists) {
     throw new apiError(404, 'Category not found');
@@ -51,25 +43,6 @@ const createService = asyncHandler(async (req, res) => {
 //   );
 // }
 
-
-   const parsedPrice = Number(price);
-   if (isNaN(parsedPrice) || parsedPrice <= 0) {
-    throw new apiError(400, "Price is Invalid ");
-  }
-
-  if (Number(duration) <= 0) {
-    throw new apiError(400, "Duration must be greater than 0");
-  }
-  const allowedTypes = ["online","onsite","hybrid"];
-
-  if(!allowedTypes.includes(serviceType)){
-        throw new apiError(400, "Invalid service type");
-    }
-    if ((serviceType === "onsite" || serviceType === "hybrid") &&!location ) {
-    throw new apiError( 400,
-      "Location is required for onsite and hybrid services"
-    );
-  }
 
   const imageFiles = req.files?.images || [];
   const imageUrls = [];
@@ -121,9 +94,8 @@ const createService = asyncHandler(async (req, res) => {
  
 });
 
-const updateService = asyncHandler(async (req,res) => {
-  
-   const {
+const updateService = asyncHandler(async (req, res) => {
+  const {
     title,
     description,
     category,
@@ -135,45 +107,41 @@ const updateService = asyncHandler(async (req,res) => {
     customFields,
   } = req.body;
 
-   if (!req.user?._id) {
-    throw new apiError(401, 'Unauthorized request');
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
   }
 
-  const {id} = req.params;
+  const { id } = req.params;
 
-  if(!mongoose.isValidObjectId(id)){
-    throw new apiError(400,"Invalid Id")
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid Id");
   }
 
-const service = await Service.findById(id); // yaha se id, provider, sab k access miljayga  us servic database m id se 
+  const service = await Service.findById(id);
 
- if(!service){
-      throw new apiError(404,"No Service found")
- }
-
- const currentProvider = await Provider.findOne({
-  user: req.user._id,
- })
- if(!currentProvider){
-  throw new apiError(404, "provide not found");
- }
- if (service.provider.toString() != currentProvider._id.toString()){
-    throw new apiError(403, "You are not allowed to update this service");
-
- }
-  if (title !== undefined && !title.trim()) {
-    throw new apiError(400, "Title cannot be empty");
+  if (!service) {
+    throw new apiError(404, "No Service found");
   }
 
-  if (description !== undefined && !description.trim()) {
-    throw new apiError(400, "Description cannot be empty");
+  const currentProvider = await Provider.findOne({
+    user: req.user._id,
+  });
+
+  if (!currentProvider) {
+    throw new apiError(404, "provide not found");
   }
 
+  if (
+    service.provider.toString() != currentProvider._id.toString()
+  ) {
+    throw new apiError(
+      403,
+      "You are not allowed to update this service"
+    );
+  }
+
+  // Category existence check is business/DB validation
   if (category !== undefined) {
-    if (!mongoose.isValidObjectId(category)) {
-      throw new apiError(400, "Invalid category");
-    }
-
     const categoryExists = await Category.findById(category);
 
     if (!categoryExists) {
@@ -181,33 +149,14 @@ const service = await Service.findById(id); // yaha se id, provider, sab k acces
     }
   }
 
-  if (price !== undefined) {
-    const parsedPrice = Number(price);
-
-    if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      throw new apiError(400, "Invalid price");
-    }
-  }
-
-  if (duration !== undefined) {
-    const parsedDuration = Number(duration);
-
-    if (isNaN(parsedDuration) || parsedDuration <= 0) {
-      throw new apiError(400, "Invalid duration");
-    }
-  }
-
-  if (serviceType !== undefined) {
-    const allowedTypes = ["online", "onsite", "hybrid"];
-
-    if (!allowedTypes.includes(serviceType)) {
-      throw new apiError(400, "Invalid service type");
-    }
-  }
+  // Location + serviceType business rule
+  const finalServiceType = serviceType ?? service.serviceType;
+  const finalLocation = location ?? service.location;
 
   if (
-    (serviceType === "onsite" || serviceType === "hybrid") &&
-    location === undefined
+    (finalServiceType === "onsite" ||
+      finalServiceType === "hybrid") &&
+    !finalLocation?.trim()
   ) {
     throw new apiError(
       400,
@@ -234,12 +183,13 @@ const service = await Service.findById(id); // yaha se id, provider, sab k acces
     }
   }
 
-  // update 
+  // update
   const updateData = {};
 
-  if(title !== undefined){
+  if (title !== undefined) {
     updateData.title = title.trim();
   }
+
   if (description !== undefined) {
     updateData.description = description.trim();
   }
@@ -266,7 +216,7 @@ const service = await Service.findById(id); // yaha se id, provider, sab k acces
 
   if (tags !== undefined) {
     updateData.tags = Array.isArray(tags)
-      ? tags.map(tag => tag.trim().toLowerCase())
+      ? tags.map((tag) => tag.trim().toLowerCase())
       : [];
   }
 
@@ -276,28 +226,25 @@ const service = await Service.findById(id); // yaha se id, provider, sab k acces
 
   updateData.images = imageUrls;
 
-  const updateService = await Service.findByIdAndUpdate(
-    id,updateData,
+  const updatedService = await Service.findByIdAndUpdate(
+    id,
+    updateData,
     {
-      new: true, 
+      new: true,
       runValidators: true,
-
     }
   )
     .populate("provider", "businessName isVerified")
     .populate("category", "name slug");
 
- return res.status(200).json(
-  new ApiResponse(
-    200,
-    updateService,
-    "Service updated successfully"
-  )
-);
-
-
-})
-
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      updatedService,
+      "Service updated successfully"
+    )
+  );
+});
 const getMyService = asyncHandler(async (req,res) => {
 
   if(!req.user?._id){

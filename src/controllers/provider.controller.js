@@ -14,13 +14,6 @@ const providerUser = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
     throw new apiError(401, 'Unauthorized request');
   }
-  if (!businessName?.trim() || !businessDescription?.trim() || !businessCategory) {
-    throw new apiError(400, 'All fields are required');
-  }
-
-  if (!mongoose.isValidObjectId(businessCategory)) {
-    throw new apiError(400, 'Invalid business category');
-  }
 
   const category = await Category.findById(businessCategory);
 
@@ -106,14 +99,6 @@ const providerUser = asyncHandler(async (req, res) => {
 const updateProviderDetail = asyncHandler(async (req, res) => {
   const { businessName, businessDescription, businessCategory } = req.body;
 
-  if (
-    businessName === undefined &&
-    businessDescription === undefined &&
-    businessCategory === undefined
-  ) {
-    throw new apiError(400, "At least one field is required");
-  }
-
   const currentProvider = await Provider.findOne({
     user: req.user._id,
   });
@@ -193,9 +178,7 @@ const updateProviderDetail = asyncHandler(async (req, res) => {
       "Provider details updated successfully"
     )
   );
-});  //  PATCH controllers should validate only the fields that are provided.
-//Do not force all fields to be present like a POST controller.
- 
+});  
 const updateProviderDocument = asyncHandler(async (req,res) => {
   const currentProvider = await Provider.findOne({
     user:req.user._id 

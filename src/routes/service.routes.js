@@ -9,6 +9,12 @@ import {
   getAllServices,
   getServiceById,
 } from "../controllers/service.controller.js";
+import { validate } from "../middlewares/validation.middleware.js";
+
+import {
+  validateCreateService,
+  validateUpdateService,
+} from "../validators/service.validator.js";
 
 
 const router = Router();
@@ -19,7 +25,7 @@ router.route("/")
       name: "images",
       maxCount: 5,
     },
-  ]),createService
+  ]),validate(validateCreateService),createService
 );
 
 router.route("/all").get(getAllServices)
@@ -34,7 +40,7 @@ router.route("/:id").patch(
       name: "images",
       maxCount: 5,
     },
-  ]), updateService
+  ]), validate(validateUpdateService), updateService
 );
 router.route("/:id").delete(verifyJWT,deleteService);
 
