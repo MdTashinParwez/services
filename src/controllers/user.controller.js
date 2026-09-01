@@ -36,28 +36,28 @@ const generateAccessAndRefreshTokens = async (userId) => {
 const registerUser = asyncHandler(async (req,res)=>{
  
   const {username,email,password,phone} = req.body;
-    
-    // input validation
-    if( [username,email,password,phone].some((field) => !field?.trim())){
-        throw new apiError(400, "All fields are required")
-    }
-    if(password.length < 6){
-        throw new apiError(400, "Password must be at least 6 characters long")
-    }
-    if(!/\S+@\S+\.\S+/.test(email)){
-        throw new apiError(400, "Invalid email format")
+
+  const existingUser = await User.findOne({
+    $or: [
+      { email },
+      { username: username.toLowerCase() },
+      { phone }
+    ]
+  });
+
+  if (existingUser) {
+    if (existingUser.email === email) {
+      throw new apiError(409, "Email is already registered");
     }
 
-     // check if user already exists
-        const existingUser = await User.findOne({
-    $or: [
-        { email },
-        { username: username.toLowerCase() }
-            ]
-        })    
-            if(existingUser){
-            throw new apiError(409, "User with this email already exists")
-        }
+    if (existingUser.username === username.toLowerCase()) {
+      throw new apiError(409, "Username is already taken");
+    }
+
+    if (existingUser.phone === phone) {
+      throw new apiError(409, "Phone number is already registered");
+    }
+  }
 
     // avatar handling
     
@@ -94,11 +94,7 @@ const registerUser = asyncHandler(async (req,res)=>{
 
 const loginUser = asyncHandler(async (req, res)=>{
 
-   const {email,password,phone} = req.body
-
-   if((!email && !phone) || !password){
-      throw new apiError(400, "Email/Phone and password are required")
-   }
+   const {email,password,phone} = req.body;
 
     const user = await  User.findOne({
     $or: [{email},{phone}]
@@ -221,18 +217,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async(req,res) =>{
   const {oldPassword, newPassword} = req.body
 
-  if(!oldPassword || !newPassword){
-    throw new apiError(400,"Old password and new password are required")
-  }
-
-  if(oldPassword === newPassword){
-    throw new apiError(400,"New password cannot be same as old password")
-  }
-
-  if(newPassword.length < 6){
-    throw new apiError(400,"Password must be at least 6 characters long")
-  }
-
   const user = await User.findById(req.user?._id).select("+password")
   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
   if(!isPasswordCorrect){
@@ -255,10 +239,6 @@ const getCurrentUser = asyncHandler(async(req,res)=>{
 
 const updateProfileDetails = asyncHandler(async(req,res) =>{
   const {username, email, phone} = req.body 
-
-  if([username, email, phone].some((field) => !field?.trim())){
-    throw new apiError(400, "All fields are required")
-    }
 
     const existingUser = await User.findOne({
       _id: { $ne: req.user?._id },
