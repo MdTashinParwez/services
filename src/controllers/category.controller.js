@@ -3,9 +3,11 @@ import { Category } from "../models/category.model.js";
 import { apiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import redisClient from "../utils/redis.js";
+
 
 const createCategory = asyncHandler(async (req, res) => {
-  const { name, description, icon, image, subcategories } = req.body;
+  const { name, description, subcategories } = req.body;
 
   if (!name?.trim()) {
     throw new apiError(400, "Category name is required");
@@ -28,8 +30,6 @@ const createCategory = asyncHandler(async (req, res) => {
     name: name.trim(),
     slug,
     description,
-    icon,
-    image,
     subcategories
   });
 
@@ -44,17 +44,54 @@ const createCategory = asyncHandler(async (req, res) => {
     );
 });
 
-
 const getAllCategories = asyncHandler(async (req, res) => {
+  const cacheKey = "categories:all";
 
+  let cachedCategories = null;
+
+  // Redis GET
+  try {
+    cachedCategories = await redisClient.get(cacheKey);
+  } catch (error) {
+    console.error("Redis cache read failed:", error);
+  }
+
+  if (cachedCategories) {
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          JSON.parse(cachedCategories),
+          "Categories fetched successfully"
+        )
+      );
+  }
+
+  // Cache MISS
   const categories = await Category.find({
     isActive: true
   })
     .sort({ name: 1 })
     .select(
-      "name slug description icon image subcategories serviceCount"
+      "name slug description subcategories serviceCount"
     );
 
+  // Store result in Redis
+  try {
+    await redisClient.set(
+      cacheKey,
+      JSON.stringify(categories),
+      {
+        EX: 60
+      }
+    );
+  } catch (error) {
+    console.error("Redis cache write failed:", error);
+  }
+
+  // Return response
   return res
     .status(200)
     .json(
@@ -65,7 +102,6 @@ const getAllCategories = asyncHandler(async (req, res) => {
       )
     );
 });
-
 
 const getCategoryById = asyncHandler(async (req, res) => {
 
@@ -95,15 +131,11 @@ const getCategoryById = asyncHandler(async (req, res) => {
     );
 });
 
-
 const updateCategory = asyncHandler(async (req, res) => {
-
   const { id } = req.params;
   const {
     name,
     description,
-    icon,
-    image,
     subcategories,
     isActive
   } = req.body;
@@ -148,14 +180,6 @@ const updateCategory = asyncHandler(async (req, res) => {
     category.description = description;
   }
 
-  if (icon !== undefined) {
-    category.icon = icon;
-  }
-
-  if (image !== undefined) {
-    category.image = image;
-  }
-
   if (subcategories !== undefined) {
     category.subcategories = subcategories;
   }
@@ -165,6 +189,13 @@ const updateCategory = asyncHandler(async (req, res) => {
   }
 
   await category.save();
+
+  // Invalidate cache after successful DB update
+  try {
+    await redisClient.del("categories:all");
+  } catch (error) {
+    console.error("Redis cache invalidation failed:", error);
+  }
 
   return res
     .status(200)

@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   createCategory,
   getAllCategories,
+  updateCategory,
 } from "../controllers/category.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -23,6 +24,8 @@ router
     verifyJWT,
     createCategory
   );
+
+router.route("/:id").patch(verifyJWT,updateCategory);
 
 
 export default router;
