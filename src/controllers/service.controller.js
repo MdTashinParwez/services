@@ -6,6 +6,8 @@ import { apiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import redisClient from "../utils/redis.js";
+
 
 const createService = asyncHandler(async (req, res) => {
   const {
@@ -307,6 +309,32 @@ const getAllServices = asyncHandler(async (req, res) => {
 
   const skip = (page - 1) * limit;
 
+
+ const cacheKey = `services:page:${page}:limit:${limit}:search:${search}`;
+
+  // Check Redis cache
+  let cachedServices = null;
+
+  try {
+    cachedServices = await redisClient.get(cacheKey);
+  } catch (error) {
+    console.error("Redis cache read failed:", error);
+  }
+
+  if (cachedServices) {
+
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        JSON.parse(cachedServices),
+        "Services fetched successfully"
+      )
+    );
+  }
+
+  // cache miss
+
   const query = {
     isActive: true,
   };
@@ -340,15 +368,30 @@ const getAllServices = asyncHandler(async (req, res) => {
 
   const totalPages = Math.ceil(totalServices / limit);
 
+    const responseData = {
+    services,
+    currentPage: page,
+    totalPages,
+    totalServices,
+  };
+
+  // Store result in Redis
+  try {
+    await redisClient.set(
+      cacheKey,
+      JSON.stringify(responseData),
+      {
+        EX: 60,
+      }
+    );
+  } catch (error) {
+    console.error("Redis cache write failed:", error);
+  }
+
   return res.status(200).json(
     new ApiResponse(
       200,
-      {
-        services,
-        currentPage: page,
-        totalPages,
-        totalServices,
-      },
+      responseData,
       "Services fetched successfully"
     )
   );
