@@ -31,6 +31,8 @@ import categoryRouter from "./routes/category.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import healthRouter from "./routes/health.routes.js"; // redis health
 
+import testRouter from "./routes/test.routes.js"; // test routes
+
 
 
 
@@ -44,7 +46,7 @@ app.use("/api/v1/payment",paymentRouter)
 app.use("/api/v1/categories",categoryRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/health", healthRouter); // redis health 
-
+app.use("/test", testRouter);
 
 
 
