@@ -29,7 +29,6 @@ const rateLimiter = ({
         } catch (error) {
             console.error("Rate limiter error:", error);
 
-            // Redis fail hone par API ko block nahi karenge
             next();
         }
     };

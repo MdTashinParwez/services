@@ -4,7 +4,7 @@ import {User} from '../models/user.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
 import {ApiResponse} from '../utils/apiResponse.js';
 import jwt from "jsonwebtoken"
-
+import notificationQueue from "../queues/notification.queue.js";
 
 
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -88,6 +88,14 @@ const registerUser = asyncHandler(async (req,res)=>{
    if(!createdUser){
     throw new apiError(500, "Failed to create user")
    }
+
+   // Add a job to the notification queue for sending a welcome email
+  await notificationQueue.add("welcome-email", {
+      userId: createdUser._id.toString(),
+      username: createdUser.username,
+      email: createdUser.email,
+    });
+
    return res.status(201).json(new ApiResponse(201,createdUser, "User registered successfully"))
 
 })

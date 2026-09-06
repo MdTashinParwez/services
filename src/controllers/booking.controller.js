@@ -8,6 +8,7 @@ import { ApiResponse } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { Service } from "../models/service.model.js";
+import notificationQueue from "../queues/notification.queue.js";
 
 const createBooking = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
@@ -155,12 +156,18 @@ const createBooking = asyncHandler(async (req, res) => {
     })
   const createdBooking = await Booking.findById(booking._id).populate("service", "title price")
   .populate("provider", "businessName isVerified")
-  .populate("customer", "fullName email");
+  .populate("customer", "username email");
 
   if(!createdBooking){
     throw new apiError(400,"Booking failed");
   }
-    await Service.findByIdAndUpdate(service._id, {
+
+  
+  await notificationQueue.add("booking-created-email", {
+    bookingId: createdBooking._id.toString(),
+  });
+
+  await Service.findByIdAndUpdate(service._id, {
   $inc: {
     bookingCount: 1,
   },
@@ -320,7 +327,11 @@ const cancelBooking = asyncHandler(async (req,res) => {
     throw new apiError(400,"Cancellation reason is too long");
    }
   booking.cancellationReason = cancellationReason;
- 
+  
+  
+await notificationQueue.add("booking-cancelled-email", {
+  bookingId: booking._id.toString(),
+});
   
 
    await booking.save();
@@ -452,6 +463,11 @@ const acceptBooking = asyncHandler(async (req, res) => {
 
   await booking.save();
 
+
+  await notificationQueue.add("booking-accepted-email", {
+  bookingId: booking._id.toString(),
+});
+
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -521,6 +537,10 @@ const rejectBooking = asyncHandler(async (req, res) => {
   booking.cancellationReason = rejectionReason;
 
   await booking.save();
+
+  await notificationQueue.add("booking-rejected-email", {
+  bookingId: booking._id.toString(),
+});
 
   return res.status(200).json(
     new ApiResponse(
@@ -629,7 +649,10 @@ const completeBooking = asyncHandler(async (req, res) => {
   currentProvider.totalEarnings += booking.totalAmount;
 
   await currentProvider.save();
- 
+  
+ await notificationQueue.add("booking-completed-email", {
+  bookingId: booking._id.toString(),
+});
 
   return res.status(200).json(
     new ApiResponse(
