@@ -5,7 +5,6 @@ const sendEmail = async ({
     subject,
     html,
 }) => {
-
     const { data, error } = await resend.emails.send({
         from: "onboarding@resend.dev",
         to,
@@ -17,8 +16,6 @@ const sendEmail = async ({
         console.error("Email sending failed:", error);
         throw new Error(error.message);
     }
-
-    console.log("Email sent successfully:", data);
 
     return data;
 };
