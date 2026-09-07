@@ -57,7 +57,6 @@ const getAllCategories = asyncHandler(async (req, res) => {
   }
 
   if (cachedCategories) {
-
     return res
       .status(200)
       .json(
@@ -83,9 +82,8 @@ const getAllCategories = asyncHandler(async (req, res) => {
     await redisClient.set(
       cacheKey,
       JSON.stringify(categories),
-      {
-        EX: 60
-      }
+      "EX",
+      600 // Cache for 10 minutes
     );
   } catch (error) {
     console.error("Redis cache write failed:", error);

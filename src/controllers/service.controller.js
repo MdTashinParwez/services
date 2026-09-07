@@ -380,9 +380,9 @@ const getAllServices = asyncHandler(async (req, res) => {
     await redisClient.set(
       cacheKey,
       JSON.stringify(responseData),
-      {
-        EX: 60,
-      }
+      "EX",
+         600,
+      
     );
   } catch (error) {
     console.error("Redis cache write failed:", error);
