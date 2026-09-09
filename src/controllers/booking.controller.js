@@ -167,6 +167,13 @@ const createBooking = asyncHandler(async (req, res) => {
     bookingId: createdBooking._id.toString(),
   });
 
+  const io = req.app.get("io");
+
+  io.to(`user:${provider.user}`).emit("booking-created", {
+      bookingId: booking._id,
+      message: "You have received a new booking",
+  });
+
   await Service.findByIdAndUpdate(service._id, {
   $inc: {
     bookingCount: 1,
@@ -463,10 +470,17 @@ const acceptBooking = asyncHandler(async (req, res) => {
 
   await booking.save();
 
-
   await notificationQueue.add("booking-accepted-email", {
   bookingId: booking._id.toString(),
-});
+  });
+
+  const io = req.app.get("io");
+
+  io.to(`user:${booking.customer}`).emit("booking-accepted", {
+      bookingId: booking._id,
+      message: "Your booking has been accepted",
+  });
+
 
   return res.status(200).json(
     new ApiResponse(
