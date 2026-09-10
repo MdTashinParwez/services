@@ -1,16 +1,18 @@
-import {Booking} from "../models/booking.model.js"
-import mongoose, { mongo } from 'mongoose';
-import { Provider } from '../models/provider.model.js';
-import { User } from '../models/user.model.js';
-import { Category } from '../models/category.model.js';
-import { apiError } from '../utils/apiError.js';
-import { ApiResponse } from '../utils/apiResponse.js';
-import asyncHandler from '../utils/asyncHandler.js';
-import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { Booking } from "../models/booking.model.js";
+import mongoose, { mongo } from "mongoose";
+import { Provider } from "../models/provider.model.js";
+import { User } from "../models/user.model.js";
+import { Category } from "../models/category.model.js";
+import { apiError } from "../utils/apiError.js";
+import { ApiResponse } from "../utils/apiResponse.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { Service } from "../models/service.model.js";
 import notificationQueue from "../queues/notification.queue.js";
+import { Notification } from "../models/notification.model.js";
 
 const createBooking = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
@@ -40,75 +42,80 @@ const createBooking = asyncHandler(async (req, res) => {
     throw new apiError(404, "Service not found");
   }
 
-  if(!service.isActive){
+  if (!service.isActive) {
     throw new apiError(400, "Service is not active");
   }
 
-  const provider =  await Provider.findById(service.provider) 
+  const provider = await Provider.findById(service.provider);
 
-  
- 
-  if(!provider){
-     throw new apiError(404, "provider is not exits");
-  }
-//   if (!provider.isActive) {
-//   throw new apiError(400, "Provider is not active");
-// }
-  if(!provider.isApproved){
-     throw new apiError(403, "provider is not approved");
+  if (!provider) {
+    throw new apiError(404, "provider is not exits");
   }
 
-  if(provider.user.toString() === req.user._id.toString()){
+  // if (!provider.isActive) {
+  //   throw new apiError(400, "Provider is not active");
+  // }
+
+  if (!provider.isApproved) {
+    throw new apiError(403, "provider is not approved");
+  }
+
+  if (provider.user.toString() === req.user._id.toString()) {
     throw new apiError(403, "You can not book your own service");
   }
-  
-
-  
 
 
-  //  booking option
+  // booking option
+
   // const bookingStart = new Date(startTime);
   // const bookingEnd = new Date(endTime);
   // const bookingDay = new Date(bookingDate);
 
-  //   if (isNaN(bookingDay.getTime())) {
-  //       throw new apiError(400, "Invalid booking date");
-  //   }
+  // if (isNaN(bookingDay.getTime())) {
+  //   throw new apiError(400, "Invalid booking date");
+  // }
 
-  //   if (bookingStart >= bookingEnd) {
+  // if (bookingStart >= bookingEnd) {
   //   throw new apiError(400, "End time must be after start time");
-  //   }
-  //   if (bookingStart < new Date()) {
-  //   throw new apiError(400, "Booking time cannot be in the past");
-  //   }
+  // }
 
-  //   const existingBooking = await Booking.findOne({
+  // if (bookingStart < new Date()) {
+  //   throw new apiError(400, "Booking time cannot be in the past");
+  // }
+
+  // const existingBooking = await Booking.findOne({
   //   service: service._id,
   //   status: {
-  //       $in: ["pending", "accepted", "in-progress"],
+  //     $in: ["pending", "accepted", "in-progress"],
   //   },
   //   startTime: {
-  //       $lt: bookingEnd,
+  //     $lt: bookingEnd,
   //   },
   //   endTime: {
-  //       $gt: bookingStart,
+  //     $gt: bookingStart,
   //   },
-  //   });
-  //   if (existingBooking) {
+  // });
+
+  // if (existingBooking) {
   //   throw new apiError(400, "Selected time slot is already booked");
-  //   }
+  // }
 
 
   const bookingDay = new Date(bookingDate);
-  if(isNaN(bookingDay.getTime())){
+
+  if (isNaN(bookingDay.getTime())) {
     throw new apiError(400, "Invalid booking date");
   }
+
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
   if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
-  throw new apiError(400, "Time must be in HH:MM format");
-    }
+    throw new apiError(400, "Time must be in HH:MM format");
+  }
+
   const bookingStart = new Date(bookingDay);
   const bookingEnd = new Date(bookingDay);
+
   const [startHour, startMinute] = startTime.split(":").map(Number);
   const [endHour, endMinute] = endTime.split(":").map(Number);
 
@@ -122,89 +129,118 @@ const createBooking = asyncHandler(async (req, res) => {
   if (bookingStart < new Date()) {
     throw new apiError(400, "Booking time cannot be in the past");
   }
-    const existingBooking = await Booking.findOne({
-      service: service._id,
-      status: {
-          $in: ["pending", "accepted", "in-progress"],
-      },
-      startTime: {
-          $lt: bookingEnd,
-      },
-      endTime: {
-          $gt: bookingStart,
-      },
-      });
-      if (existingBooking) {
-      throw new apiError(400, "Selected time slot is already booked");
-      }
 
+  const existingBooking = await Booking.findOne({
+    service: service._id,
+    status: {
+      $in: ["pending", "accepted", "in-progress"],
+    },
+    startTime: {
+      $lt: bookingEnd,
+    },
+    endTime: {
+      $gt: bookingStart,
+    },
+  });
 
-    const servicePrice = service.price;
-    const totalAmount = service.price;
-
-
-    const booking = await Booking.create({
-        customer: req.user._id,
-        service: service._id,
-        provider:provider._id,
-        bookingDate: bookingDay,
-        startTime: bookingStart,
-        endTime: bookingEnd,
-        servicePrice,
-        totalAmount,
-        customerNotes
-    })
-  const createdBooking = await Booking.findById(booking._id).populate("service", "title price")
-  .populate("provider", "businessName isVerified")
-  .populate("customer", "username email");
-
-  if(!createdBooking){
-    throw new apiError(400,"Booking failed");
+  if (existingBooking) {
+    throw new apiError(400, "Selected time slot is already booked");
   }
 
-  
+
+  const servicePrice = service.price;
+  const totalAmount = service.price;
+
+
+  const booking = await Booking.create({
+    customer: req.user._id,
+    service: service._id,
+    provider: provider._id,
+    bookingDate: bookingDay,
+    startTime: bookingStart,
+    endTime: bookingEnd,
+    servicePrice,
+    totalAmount,
+    customerNotes,
+  });
+
+
+  const createdBooking = await Booking.findById(booking._id)
+    .populate("service", "title price")
+    .populate("provider", "businessName isVerified")
+    .populate("customer", "username email");
+
+  if (!createdBooking) {
+    throw new apiError(400, "Booking failed");
+  }
+
+
+  // PERSISTENT NOTIFICATION
+  await Notification.create({
+    recipient: provider.user,
+    sender: req.user._id,
+    type: "booking_request",
+    title: "New Booking Request",
+    message: "You have received a new booking request",
+    data: {
+      bookingId: booking._id,
+      serviceId: booking.service,
+      providerId: booking.provider,
+    },
+    priority: "medium",
+  });
+
+
   await notificationQueue.add("booking-created-email", {
     bookingId: createdBooking._id.toString(),
   });
 
+
+  // REAL-TIME NOTIFICATION
   const io = req.app.get("io");
 
   io.to(`user:${provider.user}`).emit("booking-created", {
-      bookingId: booking._id,
-      message: "You have received a new booking",
+    bookingId: booking._id,
+    message: "You have received a new booking",
   });
+
 
   await Service.findByIdAndUpdate(service._id, {
-  $inc: {
-    bookingCount: 1,
-  },
+    $inc: {
+      bookingCount: 1,
+    },
   });
+
   await Provider.findByIdAndUpdate(provider._id, {
-  $inc: {
-    totalBookings: 1,
-  },
-});
+    $inc: {
+      totalBookings: 1,
+    },
+  });
 
- return res.status(201).json(
+
+  return res.status(201).json(
     new ApiResponse(
-        201,
-        createdBooking,
-        "Booking created successfully"
+      201,
+      createdBooking,
+      "Booking created successfully"
     )
-);
-
-
-
-
-});  //future: tranction 
+  );
+});
+// future: tranction
 
 const getMyBookings = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
 
   const page = Math.max(parseInt(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+
+  const limit = Math.min(
+    Math.max(parseInt(req.query.limit) || 10, 1),
+    20
+  );
+
   const skip = (page - 1) * limit;
 
   const totalBookings = await Booking.countDocuments({
@@ -234,7 +270,9 @@ const getMyBookings = asyncHandler(async (req, res) => {
   );
 });
 
+
 const getBookingById = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
@@ -254,110 +292,153 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new apiError(404, "Booking not found");
   }
 
- 
-const userId = req.user._id.toString();
 
-const isCustomer = booking.customer._id.toString() === userId;
+  const userId = req.user._id.toString();
 
-let isProvider = false;
+  const isCustomer =
+    booking.customer._id.toString() === userId;
 
-if (req.user.role === "provider") {
-  const provider = await Provider.findOne({
-    user: req.user._id,
-  });
+  let isProvider = false;
 
-  if (
-    provider &&
-    booking.provider._id.toString() === provider._id.toString()
-  ) {
-    isProvider = true;
+  if (req.user.role === "provider") {
+
+    const provider = await Provider.findOne({
+      user: req.user._id,
+    });
+
+    if (
+      provider &&
+      booking.provider._id.toString() === provider._id.toString()
+    ) {
+      isProvider = true;
+    }
   }
-}
 
-if (!isCustomer && !isProvider) {
-  throw new apiError(403, "Access denied");
-}
+  if (!isCustomer && !isProvider) {
+    throw new apiError(403, "Access denied");
+  }
 
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-      booking,
-      isProvider,
-      isCustomer,
-    },
+        booking,
+        isProvider,
+        isCustomer,
+      },
       "Booking fetched successfully"
     )
   );
 });
 
-const cancelBooking = asyncHandler(async (req,res) => {
-  if(!req.user._id){
-    throw new apiError(400,"unauthorize reqest")
+
+const cancelBooking = asyncHandler(async (req, res) => {
+
+  if (!req.user._id) {
+    throw new apiError(400, "unauthorize reqest");
   }
   const { cancellationReason } = req.body || {};
-
-  const {id} = req.params
-
-  if(!mongoose.isValidObjectId(id)){
-        throw new apiError(400,"Invalid id")
-
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid id");
   }
 
   // booking bussiness logic
-  const booking = await Booking.findById(id)
-  
 
-  if(!booking){
-        throw new apiError(404, "Booking not found");
-
+  const booking = await Booking.findById(id);
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
   }
-  
-  if(booking.customer.toString() !== req.user._id.toString()){
+  if (
+    booking.customer.toString() !==
+    req.user._id.toString()
+  ) {
     throw new apiError(403, "Access Denied");
   }
- if (booking.status === "completed") {
-    throw new apiError(400, "Completed booking cannot be cancelled");
+  if (booking.status === "completed") {
+    throw new apiError(
+      400,
+      "Completed booking cannot be cancelled"
+    );
   }
+
   if (booking.status === "cancelled") {
-    throw new apiError(400, "Booking is already cancelled");
+    throw new apiError(
+      400,
+      "Booking is already cancelled"
+    );
   }
   if (booking.status === "in-progress") {
-    throw new apiError(400, "Booking is already in progress");
+    throw new apiError(
+      400,
+      "Booking is already in progress"
+    );
+  }
+  booking.status = "cancelled";
+  booking.cancelledBy = "customer";
+  if (
+    cancellationReason &&
+    cancellationReason.trim().length > 100
+  ) {
+    throw new apiError(
+      400,
+      "Cancellation reason is too long"
+    );
   }
 
-  booking.status = "cancelled";
-  booking.cancelledBy  = "customer";
-
-   if (cancellationReason && cancellationReason.trim().length > 100){
-    throw new apiError(400,"Cancellation reason is too long");
-   }
   booking.cancellationReason = cancellationReason;
-  
-  
-await notificationQueue.add("booking-cancelled-email", {
-  bookingId: booking._id.toString(),
-});
-  
 
-   await booking.save();
+  await booking.save();
+
+  const provider = await Provider.findById(booking.provider);
+  if (!provider) {
+    throw new apiError(404, "Provider not found");
+  }
+
+  await Notification.create({
+    recipient: provider.user,
+    sender: req.user._id,
+    type: "booking_cancelled",
+    title: "Booking Cancelled",
+    message: "A customer has cancelled a booking",
+    data: {
+      bookingId: booking._id,
+      serviceId: booking.service,
+      providerId: booking.provider,
+    },
+    priority: "medium",
+  });
+
+
+  await notificationQueue.add("booking-cancelled-email", {
+    bookingId: booking._id.toString(),
+  });
+
+
+  const io = req.app.get("io");
+  io.to(`user:${provider.user}`).emit("booking-cancelled", {
+    bookingId: booking._id,
+    message: "A customer has cancelled a booking",
+  });
+
 
   return res.status(200).json(
     new ApiResponse(
-        200,
-        booking,
-        "Booking cancelled successfully"
+      200,
+      booking,
+      "Booking cancelled successfully"
     )
-);
+  );
+});
 
-})
 
 const getProviderBookings = asyncHandler(async (req, res) => {
 
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
+
   const currentProvider = await Provider.findOne({
     user: req.user._id,
   });
@@ -367,7 +448,12 @@ const getProviderBookings = asyncHandler(async (req, res) => {
   }
 
   const page = Math.max(parseInt(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+
+  const limit = Math.min(
+    Math.max(parseInt(req.query.limit) || 10, 1),
+    20
+  );
+
   const skip = (page - 1) * limit;
 
   const { status } = req.query;
@@ -377,6 +463,7 @@ const getProviderBookings = asyncHandler(async (req, res) => {
   };
 
   if (status) {
+
     const allowedStatus = [
       "pending",
       "accepted",
@@ -419,6 +506,7 @@ const getProviderBookings = asyncHandler(async (req, res) => {
 
 
 const acceptBooking = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
@@ -443,7 +531,10 @@ const acceptBooking = asyncHandler(async (req, res) => {
     throw new apiError(404, "Provider not found");
   }
 
-  if (booking.provider.toString() !== currentProvider._id.toString()) {
+  if (
+    booking.provider.toString() !==
+    currentProvider._id.toString()
+  ) {
     throw new apiError(
       403,
       "You are not allowed to accept this booking"
@@ -455,33 +546,59 @@ const acceptBooking = asyncHandler(async (req, res) => {
   }
 
   if (booking.status === "cancelled") {
-    throw new apiError(400, "Cancelled booking cannot be accepted");
+    throw new apiError(
+      400,
+      "Cancelled booking cannot be accepted"
+    );
   }
 
   if (booking.status === "completed") {
-    throw new apiError(400, "Completed booking cannot be accepted");
+    throw new apiError(
+      400,
+      "Completed booking cannot be accepted"
+    );
   }
 
   if (booking.status === "in-progress") {
-    throw new apiError(400, "Booking is already in progress");
+    throw new apiError(
+      400,
+      "Booking is already in progress"
+    );
   }
 
   booking.status = "accepted";
 
   await booking.save();
 
-  await notificationQueue.add("booking-accepted-email", {
-  bookingId: booking._id.toString(),
+
+
+  // PERSISTENT NOTIFICATION
+
+  await Notification.create({
+    recipient: booking.customer,
+    sender: req.user._id,
+    type: "booking_accepted",
+    title: "Booking Accepted",
+    message: "Your booking has been accepted",
+    data: {
+      bookingId: booking._id,
+      serviceId: booking.service,
+      providerId: booking.provider,
+    },
+    priority: "medium",
   });
+
+
+  await notificationQueue.add("booking-accepted-email", {
+    bookingId: booking._id.toString(),
+  });
+
 
   const io = req.app.get("io");
-
   io.to(`user:${booking.customer}`).emit("booking-accepted", {
-      bookingId: booking._id,
-      message: "Your booking has been accepted",
+    bookingId: booking._id,
+    message: "Your booking has been accepted",
   });
-
-
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -491,12 +608,15 @@ const acceptBooking = asyncHandler(async (req, res) => {
   );
 });
 
+
 const rejectBooking = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
 
   const { rejectionReason } = req.body || {};
+
   const { id } = req.params;
 
   if (!mongoose.isValidObjectId(id)) {
@@ -517,7 +637,10 @@ const rejectBooking = asyncHandler(async (req, res) => {
     throw new apiError(404, "Provider not found");
   }
 
-  if (booking.provider.toString() !== currentProvider._id.toString()) {
+  if (
+    booking.provider.toString() !==
+    currentProvider._id.toString()
+  ) {
     throw new apiError(
       403,
       "You are not allowed to reject this booking"
@@ -532,29 +655,70 @@ const rejectBooking = asyncHandler(async (req, res) => {
   }
 
   if (booking.status === "cancelled") {
-    throw new apiError(400, "Booking is already cancelled");
+    throw new apiError(
+      400,
+      "Booking is already cancelled"
+    );
   }
 
   if (booking.status === "completed") {
-    throw new apiError(400, "Completed booking cannot be rejected");
+    throw new apiError(
+      400,
+      "Completed booking cannot be rejected"
+    );
   }
 
   if (booking.status === "in-progress") {
-    throw new apiError(400, "Booking is already in progress");
+    throw new apiError(
+      400,
+      "Booking is already in progress"
+    );
   }
 
   booking.status = "cancelled";
   booking.cancelledBy = "provider";
-   if (rejectionReason && rejectionReason.trim().length > 100){
-    throw new apiError(400,"Cancellation reason is too long");
+
+  if (
+    rejectionReason &&
+    rejectionReason.trim().length > 100
+  ) {
+    throw new apiError(
+      400,
+      "Cancellation reason is too long"
+    );
   }
+
   booking.cancellationReason = rejectionReason;
 
   await booking.save();
 
+  await Notification.create({
+    recipient: booking.customer,
+    sender: req.user._id,
+    type: "booking_rejected",
+    title: "Booking Rejected",
+    message: "Your booking has been rejected",
+    data: {
+      bookingId: booking._id,
+      serviceId: booking.service,
+      providerId: booking.provider,
+    },
+    priority: "medium",
+  });
+
+
   await notificationQueue.add("booking-rejected-email", {
-  bookingId: booking._id.toString(),
-});
+    bookingId: booking._id.toString(),
+  });
+
+
+  const io = req.app.get("io");
+
+  io.to(`user:${booking.customer}`).emit("booking-rejected", {
+    bookingId: booking._id,
+    message: "Your booking has been rejected",
+  });
+
 
   return res.status(200).json(
     new ApiResponse(
@@ -565,7 +729,9 @@ const rejectBooking = asyncHandler(async (req, res) => {
   );
 });
 
+
 const startBooking = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
@@ -590,7 +756,10 @@ const startBooking = asyncHandler(async (req, res) => {
     throw new apiError(404, "Provider not found");
   }
 
-  if (booking.provider.toString() !== currentProvider._id.toString()) {
+  if (
+    booking.provider.toString() !==
+    currentProvider._id.toString()
+  ) {
     throw new apiError(
       403,
       "You are not allowed to start this booking"
@@ -617,7 +786,9 @@ const startBooking = asyncHandler(async (req, res) => {
   );
 });
 
+
 const completeBooking = asyncHandler(async (req, res) => {
+
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
@@ -642,7 +813,10 @@ const completeBooking = asyncHandler(async (req, res) => {
     throw new apiError(404, "Provider not found");
   }
 
-  if (booking.provider.toString() !== currentProvider._id.toString()) {
+  if (
+    booking.provider.toString() !==
+    currentProvider._id.toString()
+  ) {
     throw new apiError(
       403,
       "You are not allowed to complete this booking"
@@ -659,14 +833,40 @@ const completeBooking = asyncHandler(async (req, res) => {
   booking.status = "completed";
 
   await booking.save();
-   currentProvider.completedBookings += 1;
+
+  currentProvider.completedBookings += 1;
+
   currentProvider.totalEarnings += booking.totalAmount;
 
   await currentProvider.save();
-  
- await notificationQueue.add("booking-completed-email", {
-  bookingId: booking._id.toString(),
-});
+
+  await Notification.create({
+    recipient: booking.customer,
+    sender: req.user._id,
+    type: "service_completed",
+    title: "Booking Completed",
+    message: "Your booking has been completed",
+    data: {
+      bookingId: booking._id,
+      serviceId: booking.service,
+      providerId: booking.provider,
+    },
+    priority: "medium",
+  });
+
+
+  await notificationQueue.add("booking-completed-email", {
+    bookingId: booking._id.toString(),
+  });
+
+
+  const io = req.app.get("io");
+
+  io.to(`user:${booking.customer}`).emit("booking-completed", {
+    bookingId: booking._id,
+    message: "Your booking has been completed",
+  });
+
 
   return res.status(200).json(
     new ApiResponse(
@@ -677,7 +877,8 @@ const completeBooking = asyncHandler(async (req, res) => {
   );
 });
 
-export{
+
+export {
   createBooking,
   getMyBookings,
   getBookingById,
@@ -687,4 +888,4 @@ export{
   rejectBooking,
   startBooking,
   completeBooking,
-}
+};
