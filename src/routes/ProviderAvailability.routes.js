@@ -4,7 +4,7 @@ import {
   createProviderAvailability,
   getProviderAvailability,
   updateProviderAvailability,
-  deleteProviderAvailability,
+  deleteProviderAvailability,getAvailableSlots
 } from "../controllers/ProviderAvailability.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -22,5 +22,10 @@ router
   .route("/:availabilityId")
   .patch(updateProviderAvailability)
   .delete(deleteProviderAvailability);
+
+router.get(
+  "/slots",
+  getAvailableSlots
+);
 
 export default router;

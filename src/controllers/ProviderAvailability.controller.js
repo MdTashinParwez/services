@@ -4,6 +4,8 @@ import { Provider } from "../models/provider.model.js";
 import { apiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import {generateSlots} from "../utils/providerAvailabilty.utils.js";
+import { Service } from "../models/service.model.js";
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -334,4 +336,120 @@ const deleteProviderAvailability = asyncHandler(async (req, res) => {
   );
 });
 
-export { createProviderAvailability, getProviderAvailability, updateProviderAvailability, deleteProviderAvailability };
+
+//  Get available slots for a specific service on a given date
+const getAvailableSlots = asyncHandler(async (req, res) => {
+  const { serviceId, date } = req.query;
+
+  if (!serviceId || !date) {
+    throw new apiError(
+      400,
+      "Service id and date are required"
+    );
+  }
+
+  if (!mongoose.isValidObjectId(serviceId)) {
+    throw new apiError(400, "Invalid service id");
+  }
+
+  const selectedDate = new Date(date);
+
+  if (isNaN(selectedDate.getTime())) {
+    throw new apiError(400, "Invalid date");
+  }
+
+  // Normalize date
+  selectedDate.setHours(0, 0, 0, 0);
+
+  const service = await Service.findById(serviceId);
+
+  if (!service) {
+    throw new apiError(404, "Service not found");
+  }
+
+  if (!service.isActive) {
+    throw new apiError(400, "Service is not active");
+  }
+
+  if (!service.duration || service.duration <= 0) {
+    throw new apiError(
+      400,
+      "Service duration is invalid"
+    );
+  }
+
+  const provider = await Provider.findById(service.provider);
+
+  if (!provider) {
+    throw new apiError(
+      404,
+      "Provider not found"
+    );
+  }
+
+  // if (!provider.isActive) {
+  //   throw new apiError(
+  //     400,
+  //     "Provider is not active"
+  //   );
+  // }
+
+  if (!provider.isApproved) {
+    throw new apiError(
+      403,
+      "Provider is not approved"
+    );
+  }
+
+
+  const dayOfWeek = selectedDate.getDay();
+
+  const availabilities =
+    await ProviderAvailability.find({
+      provider: provider._id,
+      dayOfWeek,
+      isAvailable: true,
+    }).sort({
+      startTime: 1,
+    });
+
+  if (!availabilities.length) {
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        [],
+        "No availability found for selected date"
+      )
+    );
+  }
+
+  const slots = [];
+
+  for (const availability of availabilities) {
+    const windowSlots = generateSlots({
+      startTime: availability.startTime,
+      endTime: availability.endTime,
+      duration: service.duration,
+      interval: 30,
+    });
+
+    slots.push(
+      ...windowSlots.map((slot) => ({
+        ...slot,
+        date,
+        serviceId: service._id,
+        providerId: provider._id,
+      }))
+    );
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      slots,
+      "Available slots fetched successfully"
+    )
+  );
+});
+
+export { createProviderAvailability, getProviderAvailability, updateProviderAvailability, deleteProviderAvailability,getAvailableSlots };
