@@ -31,7 +31,7 @@ import paymentRouter from "./routes/payment.routes.js"
 import categoryRouter from "./routes/category.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import healthRouter from "./routes/health.routes.js"; // redis health
-
+import providerAvailabilityRouter from "./routes/ProviderAvailability.routes.js";
 
 
 
@@ -45,9 +45,8 @@ app.use("/api/v1/booking",bookingRouter);
 app.use("/api/v1/payment",paymentRouter)
 app.use("/api/v1/categories",categoryRouter);
 app.use("/api/v1/notifications", notificationRouter);
-app.use("/health", healthRouter); // redis health 
-
-
+app.use("/health", healthRouter); // redis health
+app.use("/api/v1/provider-availability", providerAvailabilityRouter); 
 
 
 
