@@ -6,6 +6,8 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import {generateSlots} from "../utils/providerAvailabilty.utils.js";
 import { Service } from "../models/service.model.js";
+import { Booking } from "../models/booking.model.js";
+
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -338,6 +340,7 @@ const deleteProviderAvailability = asyncHandler(async (req, res) => {
 
 
 //  Get available slots for a specific service on a given date
+
 const getAvailableSlots = asyncHandler(async (req, res) => {
   const { serviceId, date } = req.query;
 
@@ -422,6 +425,24 @@ const getAvailableSlots = asyncHandler(async (req, res) => {
       )
     );
   }
+ 
+// Fetch existing bookings for the provider on the selected date
+const dayStart = new Date(selectedDate);
+dayStart.setHours(0, 0, 0, 0);
+
+const dayEnd = new Date(dayStart);
+dayEnd.setDate(dayEnd.getDate() + 1);
+
+const existingBookings = await Booking.find({
+  provider: provider._id,
+  bookingDate: {
+    $gte: dayStart,
+    $lt: dayEnd,
+  },
+  status: {
+    $in: ["pending", "accepted", "in-progress"],
+  },
+}).select("startTime endTime");
 
   const slots = [];
 
@@ -443,10 +464,33 @@ const getAvailableSlots = asyncHandler(async (req, res) => {
     );
   }
 
+  const availableSlots = slots.filter((slot) => {
+  const [startHour, startMinute] = slot.startTime
+    .split(":")
+    .map(Number);
+
+  const [endHour, endMinute] = slot.endTime
+    .split(":")
+    .map(Number);
+
+  const slotStart = new Date(selectedDate);
+  slotStart.setHours(startHour, startMinute, 0, 0);
+
+  const slotEnd = new Date(selectedDate);
+  slotEnd.setHours(endHour, endMinute, 0, 0);
+
+  return !existingBookings.some((booking) => {
+    return (
+      booking.startTime < slotEnd &&
+      booking.endTime > slotStart
+    );
+  });
+});
+
   return res.status(200).json(
     new ApiResponse(
       200,
-      slots,
+      availableSlots,
       "Available slots fetched successfully"
     )
   );

@@ -10,6 +10,9 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { Service } from "../models/service.model.js";
 import notificationQueue from "../queues/notification.queue.js";
 import { Notification } from "../models/notification.model.js";
+import { BookingSlot } from "../models/BookingSlot.model.js";
+import { generateBookingSlots, SLOT_INTERVAL } from "../utils/providerAvailabilty.utils.js";
+import { ProviderAvailability } from "../models/ProviderAvailability.model.js";
 
 const createBooking = asyncHandler(async (req, res) => {
 
@@ -21,16 +24,17 @@ const createBooking = asyncHandler(async (req, res) => {
     serviceId,
     bookingDate,
     startTime,
-    endTime,
     customerNotes,
   } = req.body;
 
-  if (!serviceId || !bookingDate || !startTime || !endTime) {
+  if (!serviceId || !bookingDate || !startTime ) {
     throw new apiError(
       400,
-      "Service, booking date, start time and end time are required"
+      "Service, booking date, and start time are required"
     );
   }
+
+  // Validate inputs
 
   if (!mongoose.isValidObjectId(serviceId)) {
     throw new apiError(400, "Invalid service id");
@@ -64,74 +68,166 @@ const createBooking = asyncHandler(async (req, res) => {
     throw new apiError(403, "You can not book your own service");
   }
 
-
-  // booking option
-
-  // const bookingStart = new Date(startTime);
-  // const bookingEnd = new Date(endTime);
   // const bookingDay = new Date(bookingDate);
 
   // if (isNaN(bookingDay.getTime())) {
   //   throw new apiError(400, "Invalid booking date");
   // }
 
-  // if (bookingStart >= bookingEnd) {
-  //   throw new apiError(400, "End time must be after start time");
-  // }
+//   bookingDay.setHours(0, 0, 0, 0); // Set to start of the day
 
-  // if (bookingStart < new Date()) {
-  //   throw new apiError(400, "Booking time cannot be in the past");
-  // }
+//   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+//   if (!timeRegex.test(startTime)) {
+//     throw new apiError(400, "Time must be in HH:MM format");
+//   }
 
-  // const existingBooking = await Booking.findOne({
-  //   service: service._id,
-  //   status: {
-  //     $in: ["pending", "accepted", "in-progress"],
-  //   },
-  //   startTime: {
-  //     $lt: bookingEnd,
-  //   },
-  //   endTime: {
-  //     $gt: bookingStart,
-  //   },
-  // });
+//   // const bookingStart = new Date(bookingDay);
+//   // const bookingEnd = new Date(bookingDay);
 
-  // if (existingBooking) {
-  //   throw new apiError(400, "Selected time slot is already booked");
-  // }
+//   const [startHour, startMinute] = startTime.split(":").map(Number);
 
+//   if (startMinute % SLOT_INTERVAL !== 0) {
+//   throw new apiError(
+//     400,
+//     `Start time must be in ${SLOT_INTERVAL}-minute intervals`
+//   );
+// }
+  
+//   if (!service.duration || service.duration <= 0) {
+//   throw new apiError(400, "Service duration is invalid");
+// }
+//   if (bookingStart >= bookingEnd) {
+//     throw new apiError(400, "End time must be after start time");
+//   }
 
-  const bookingDay = new Date(bookingDate);
+//   if (bookingStart < new Date()) {
+//     throw new apiError(400, "Booking time cannot be in the past");
+//   }
 
-  if (isNaN(bookingDay.getTime())) {
-    throw new apiError(400, "Invalid booking date");
-  }
+//   // check booking time is within provider availability
+//   const dayOfWeek = bookingDay.getDay();
+// const availability = await ProviderAvailability.find({
+//   provider: provider._id,
+//   dayOfWeek,
+//   isAvailable: true,
+// });
 
-  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+// const isWithinAvailability = availability.some((window) => {
+//   const [startHour, startMinute] = window.startTime.split(":").map(Number);
+//   const [endHour, endMinute] = window.endTime.split(":").map(Number);
 
-  if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
-    throw new apiError(400, "Time must be in HH:MM format");
-  }
+//   const windowStart = new Date(bookingDay);
+//   windowStart.setHours(startHour, startMinute, 0, 0);
 
-  const bookingStart = new Date(bookingDay);
-  const bookingEnd = new Date(bookingDay);
+//   const windowEnd = new Date(bookingDay);
+//   windowEnd.setHours(endHour, endMinute, 0, 0);
 
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
+//   return (
+//     bookingStart >= windowStart &&
+//     bookingEnd <= windowEnd
+//   );
+// });
 
-  bookingStart.setHours(startHour, startMinute, 0, 0);
-  bookingEnd.setHours(endHour, endMinute, 0, 0);
+// if (!isWithinAvailability) {
+//   throw new apiError(
+//     400,
+//     "Selected time is outside provider availability"
+//   );
+// }
 
-  if (bookingStart >= bookingEnd) {
-    throw new apiError(400, "End time must be after start time");
-  }
+const bookingDay = new Date(bookingDate);
 
-  if (bookingStart < new Date()) {
-    throw new apiError(400, "Booking time cannot be in the past");
-  }
+if (isNaN(bookingDay.getTime())) {
+  throw new apiError(400, "Invalid booking date");
+}
+
+bookingDay.setHours(0, 0, 0, 0);
+
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+if (!timeRegex.test(startTime)) {
+  throw new apiError(400, "Time must be in HH:MM format");
+}
+
+const [startHour, startMinute] = startTime.split(":").map(Number);
+
+if (startMinute % SLOT_INTERVAL !== 0) {
+  throw new apiError(
+    400,
+    `Start time must be in ${SLOT_INTERVAL}-minute intervals`
+  );
+}
+
+if (!service.duration || service.duration <= 0) {
+  throw new apiError(400, "Service duration is invalid");
+}
+
+const bookingStart = new Date(bookingDay);
+const bookingEnd = new Date(bookingDay);
+
+bookingStart.setHours(startHour, startMinute, 0, 0);
+
+bookingEnd.setTime(
+  bookingStart.getTime() + service.duration * 60 * 1000
+);
+
+if (bookingStart >= bookingEnd) {
+  throw new apiError(400, "End time must be after start time");
+}
+
+if (bookingStart < new Date()) {
+  throw new apiError(400, "Booking time cannot be in the past");
+}
+
+// Check booking time is within provider availability
+const dayOfWeek = bookingDay.getDay();
+
+const availability = await ProviderAvailability.find({
+  provider: provider._id,
+  dayOfWeek,
+  isAvailable: true,
+});
+
+const isWithinAvailability = availability.some((window) => {
+  const [windowStartHour, windowStartMinute] =
+    window.startTime.split(":").map(Number);
+
+  const [windowEndHour, windowEndMinute] =
+    window.endTime.split(":").map(Number);
+
+  const windowStart = new Date(bookingDay);
+  windowStart.setHours(
+    windowStartHour,
+    windowStartMinute,
+    0,
+    0
+  );
+
+  const windowEnd = new Date(bookingDay);
+  windowEnd.setHours(
+    windowEndHour,
+    windowEndMinute,
+    0,
+    0
+  );
+
+  return (
+    bookingStart >= windowStart &&
+    bookingEnd <= windowEnd
+  );
+});
+
+if (!isWithinAvailability) {
+  throw new apiError(
+    400,
+    "Selected time is outside provider availability"
+  );
+}
+
 
   const existingBooking = await Booking.findOne({
-    service: service._id,
+    // service: service._id,
+    provider: provider._id,
     status: {
       $in: ["pending", "accepted", "in-progress"],
     },
@@ -151,18 +247,58 @@ const createBooking = asyncHandler(async (req, res) => {
   const servicePrice = service.price;
   const totalAmount = service.price;
 
+  const session = await mongoose.startSession();
 
-  const booking = await Booking.create({
-    customer: req.user._id,
-    service: service._id,
-    provider: provider._id,
-    bookingDate: bookingDay,
-    startTime: bookingStart,
-    endTime: bookingEnd,
-    servicePrice,
-    totalAmount,
-    customerNotes,
+let booking;
+
+try {
+  await session.withTransaction(async () => {
+    const createdBookings = await Booking.create(
+      [
+        {
+          customer: req.user._id,
+          service: service._id,
+          provider: provider._id,
+          bookingDate: bookingDay,
+          servicePrice,
+          totalAmount,
+          startTime: bookingStart,
+          endTime: bookingEnd,
+          customerNotes,
+        },
+      ],
+      { session }
+    );
+
+    booking = createdBookings[0];
+
+    const bookingSlots = generateBookingSlots({
+      startTime: bookingStart,
+      duration: service.duration,
+    }).map((slot) => ({
+      provider: provider._id,
+      booking: booking._id,
+      slotStart: slot.slotStart,
+      slotEnd: slot.slotEnd,
+    }));
+
+    await BookingSlot.insertMany(
+      bookingSlots,
+      { session }
+    );
   });
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new apiError(
+        409,
+        "Selected time slot is no longer available"
+      );
+    }
+
+    throw error;
+  } finally {
+    await session.endSession();
+  }
 
 
   const createdBooking = await Booking.findById(booking._id)
@@ -226,7 +362,7 @@ const createBooking = asyncHandler(async (req, res) => {
     )
   );
 });
-// future: tranction
+
 
 const getMyBookings = asyncHandler(async (req, res) => {
 
@@ -334,28 +470,31 @@ const getBookingById = asyncHandler(async (req, res) => {
 
 
 const cancelBooking = asyncHandler(async (req, res) => {
-
-  if (!req.user._id) {
-    throw new apiError(400, "unauthorize reqest");
+  if (!req.user?._id) {
+    throw new apiError(400, "Unauthorized request");
   }
+
   const { cancellationReason } = req.body || {};
   const { id } = req.params;
+
   if (!mongoose.isValidObjectId(id)) {
     throw new apiError(400, "Invalid id");
   }
 
-  // booking bussiness logic
-
+  // Booking business logic
   const booking = await Booking.findById(id);
+
   if (!booking) {
     throw new apiError(404, "Booking not found");
   }
+
   if (
     booking.customer.toString() !==
     req.user._id.toString()
   ) {
     throw new apiError(403, "Access Denied");
   }
+
   if (booking.status === "completed") {
     throw new apiError(
       400,
@@ -369,14 +508,14 @@ const cancelBooking = asyncHandler(async (req, res) => {
       "Booking is already cancelled"
     );
   }
+
   if (booking.status === "in-progress") {
     throw new apiError(
       400,
       "Booking is already in progress"
     );
   }
-  booking.status = "cancelled";
-  booking.cancelledBy = "customer";
+
   if (
     cancellationReason &&
     cancellationReason.trim().length > 100
@@ -387,15 +526,35 @@ const cancelBooking = asyncHandler(async (req, res) => {
     );
   }
 
-  booking.cancellationReason = cancellationReason;
+  // Transaction
+  const session = await mongoose.startSession();
 
-  await booking.save();
+  try {
+    await session.withTransaction(async () => {
+
+      booking.status = "cancelled";
+      booking.cancelledBy = "customer";
+      booking.cancellationReason = cancellationReason;
+
+      await booking.save({ session });
+
+      // Release reserved booking slots
+      await BookingSlot.deleteMany(
+        { booking: booking._id },
+        { session }
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
 
   const provider = await Provider.findById(booking.provider);
+
   if (!provider) {
     throw new apiError(404, "Provider not found");
   }
 
+  // Persistent notification
   await Notification.create({
     recipient: provider.user,
     sender: req.user._id,
@@ -410,18 +569,17 @@ const cancelBooking = asyncHandler(async (req, res) => {
     priority: "medium",
   });
 
-
   await notificationQueue.add("booking-cancelled-email", {
     bookingId: booking._id.toString(),
   });
 
-
+  // Real-time notification
   const io = req.app.get("io");
+
   io.to(`user:${provider.user}`).emit("booking-cancelled", {
     bookingId: booking._id,
     message: "A customer has cancelled a booking",
   });
-
 
   return res.status(200).json(
     new ApiResponse(
@@ -431,7 +589,6 @@ const cancelBooking = asyncHandler(async (req, res) => {
     )
   );
 });
-
 
 const getProviderBookings = asyncHandler(async (req, res) => {
 
@@ -616,7 +773,6 @@ const rejectBooking = asyncHandler(async (req, res) => {
   }
 
   const { rejectionReason } = req.body || {};
-
   const { id } = req.params;
 
   if (!mongoose.isValidObjectId(id)) {
@@ -675,9 +831,6 @@ const rejectBooking = asyncHandler(async (req, res) => {
     );
   }
 
-  booking.status = "cancelled";
-  booking.cancelledBy = "provider";
-
   if (
     rejectionReason &&
     rejectionReason.trim().length > 100
@@ -688,10 +841,29 @@ const rejectBooking = asyncHandler(async (req, res) => {
     );
   }
 
-  booking.cancellationReason = rejectionReason;
+  // Transaction
+  const session = await mongoose.startSession();
 
-  await booking.save();
+  try {
+    await session.withTransaction(async () => {
 
+      booking.status = "cancelled";
+      booking.cancelledBy = "provider";
+      booking.cancellationReason = rejectionReason;
+
+      await booking.save({ session });
+
+      // Release reserved booking slots
+      await BookingSlot.deleteMany(
+        { booking: booking._id },
+        { session }
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  // Notification
   await Notification.create({
     recipient: booking.customer,
     sender: req.user._id,
@@ -706,19 +878,17 @@ const rejectBooking = asyncHandler(async (req, res) => {
     priority: "medium",
   });
 
-
   await notificationQueue.add("booking-rejected-email", {
     bookingId: booking._id.toString(),
   });
 
-
+  // Real-time notification
   const io = req.app.get("io");
 
   io.to(`user:${booking.customer}`).emit("booking-rejected", {
     bookingId: booking._id,
     message: "Your booking has been rejected",
   });
-
 
   return res.status(200).json(
     new ApiResponse(
@@ -728,7 +898,6 @@ const rejectBooking = asyncHandler(async (req, res) => {
     )
   );
 });
-
 
 const startBooking = asyncHandler(async (req, res) => {
 
@@ -786,9 +955,7 @@ const startBooking = asyncHandler(async (req, res) => {
   );
 });
 
-
 const completeBooking = asyncHandler(async (req, res) => {
-
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
@@ -830,16 +997,33 @@ const completeBooking = asyncHandler(async (req, res) => {
     );
   }
 
-  booking.status = "completed";
+  // Transaction
+  const session = await mongoose.startSession();
 
-  await booking.save();
+  try {
+    await session.withTransaction(async () => {
+      // 1. Complete booking
+      booking.status = "completed";
 
-  currentProvider.completedBookings += 1;
+      await booking.save({ session });
 
-  currentProvider.totalEarnings += booking.totalAmount;
+      // 2. Release reserved booking slots
+      await BookingSlot.deleteMany(
+        { booking: booking._id },
+        { session }
+      );
 
-  await currentProvider.save();
+      // 3. Update provider stats
+      currentProvider.completedBookings += 1;
+      currentProvider.totalEarnings += booking.totalAmount;
 
+      await currentProvider.save({ session });
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  // Persistent notification
   await Notification.create({
     recipient: booking.customer,
     sender: req.user._id,
@@ -854,19 +1038,18 @@ const completeBooking = asyncHandler(async (req, res) => {
     priority: "medium",
   });
 
-
+  // Email notification
   await notificationQueue.add("booking-completed-email", {
     bookingId: booking._id.toString(),
   });
 
-
+  // Real-time notification
   const io = req.app.get("io");
 
   io.to(`user:${booking.customer}`).emit("booking-completed", {
     bookingId: booking._id,
     message: "Your booking has been completed",
   });
-
 
   return res.status(200).json(
     new ApiResponse(
@@ -876,6 +1059,7 @@ const completeBooking = asyncHandler(async (req, res) => {
     )
   );
 });
+
 
 
 export {

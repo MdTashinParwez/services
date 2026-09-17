@@ -11,11 +11,13 @@ const minutesToTime = (totalMinutes) => {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
 
+const SLOT_INTERVAL = 30;
+
 const generateSlots = ({
   startTime,
   endTime,
   duration,
-  interval = 30,
+  interval = SLOT_INTERVAL,
 }) => {
   const startMinutes = timeToMinutes(startTime);
   const endMinutes = timeToMinutes(endTime);
@@ -36,8 +38,41 @@ const generateSlots = ({
   return slots;
 };
 
+const generateBookingSlots = ({
+  startTime,
+  duration,
+}) => {
+  const slots = [];
+
+  const totalSlots = Math.ceil(
+    duration / SLOT_INTERVAL
+  );
+
+  for (let i = 0; i < totalSlots; i++) {
+    const slotStart = new Date(
+      startTime.getTime() +
+        i * SLOT_INTERVAL * 60 * 1000
+    );
+
+    const slotEnd = new Date(
+      slotStart.getTime() +
+        SLOT_INTERVAL * 60 * 1000
+    );
+
+    slots.push({
+      slotStart,
+      slotEnd,
+    });
+  }
+
+  return slots;
+};
+
+
 export {
   timeToMinutes,
   minutesToTime,
   generateSlots,
+  SLOT_INTERVAL,
+  generateBookingSlots,
 };
