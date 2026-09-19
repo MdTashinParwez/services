@@ -4,6 +4,8 @@ import { ApiResponse } from '../utils/apiResponse.js';
 import { Booking } from "../models/booking.model.js";
 import { Payment } from "../models/payment.model.js";
 import asyncHandler from '../utils/asyncHandler.js';
+import razorpay from "../utils/razorpay.js";
+import crypto from "crypto";
 
 const createPayment = asyncHandler(async (req,res) => {
      
@@ -58,30 +60,60 @@ const createPayment = asyncHandler(async (req,res) => {
   }
 
   //  duplicate pending payment
-  const existingPayment = await Payment.findOne({
-    booking: booking._id,
-    paymentStatus: "pending",
+const existingPayment = await Payment.findOne({
+  booking: booking._id,
+  paymentStatus: "pending",
+});
+
+if (existingPayment) {
+  const razorpayOrder = await razorpay.orders.fetch(
+    existingPayment.orderId
+  );
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        payment: existingPayment,
+        razorpayOrder: {
+          id: razorpayOrder.id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+        },
+        keyId: process.env.RAZORPAY_KEY_ID,
+      },
+      "Existing payment order retrieved successfully"
+    )
+  );
+}
+
+  // Razorpay payment creation
+  const amountInPaise = Math.round(booking.totalAmount * 100);
+
+  const razorpayOrder = await razorpay.orders.create({
+    amount: amountInPaise,
+    currency: booking.currency || "INR",
+    receipt: `booking_${booking._id}`,
+    notes: {
+      bookingId: booking._id.toString(),
+      customerId: booking.customer.toString(),
+    },
   });
 
-  if (existingPayment) {
-    throw new apiError(
-      400,
-      "A pending payment already exists for this booking"
-    );
-  }
 
-   const payment = await Payment.create({
-    booking: booking._id,
-    customer: booking.customer,
-    provider: booking.provider,
-    amount: booking.totalAmount,
-    paymentMethod,
-    paymentStatus: "pending",
-    description: `Payment for booking #${booking._id}`,
-  });
+  const payment = await Payment.create({
+  booking: booking._id,
+  customer: booking.customer,
+  provider: booking.provider,
+  amount: booking.totalAmount,
+  currency: booking.currency || "INR",
+  paymentMethod,
+  paymentStatus: "pending",
+  orderId: razorpayOrder.id,
+  description: `Payment for booking #${booking._id}`,
+ });
 
   booking.paymentId = payment._id;
-
   await booking.save();
 
   const createdPayment = await Payment.findById(payment._id)
@@ -90,66 +122,118 @@ const createPayment = asyncHandler(async (req,res) => {
     .populate("provider", "businessName");
 
   return res.status(201).json(
-    new ApiResponse(
-      201,
-      createdPayment,
-      "Payment created successfully"
-    )
-  );
+  new ApiResponse(
+    201,
+    {
+      payment: createdPayment,
+      razorpayOrder: {
+        id: razorpayOrder.id,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+      },
+      keyId: process.env.RAZORPAY_KEY_ID,
+    },
+    "Payment order created successfully"
+  )
+);
 
 })
+const verifyPayment = asyncHandler(async (req, res) => {
 
-const paymentSuccess = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
   }
 
-  const { id } = req.params;
-  const { transactionId } = req.body || {};
+  const {
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+  } = req.body || {};
 
-  if (!mongoose.isValidObjectId(id)) {
-    throw new apiError(400, "Invalid payment id");
-  }
-  
-
-  const payment = await Payment.findById(id);
-
-  if (!payment) {
-    throw new apiError(404, "Payment not found");
-  }
-
-  // Customer ownership
-  if (payment.customer.toString() !== req.user._id.toString()) {
+  // Validate Razorpay response
+  if (
+    !razorpay_payment_id ||
+    !razorpay_order_id ||
+    !razorpay_signature
+  ) {
     throw new apiError(
-      403,
-      "You are not allowed to update this payment"
+      400,
+      "Razorpay payment details are required"
     );
   }
 
+  const {id} = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+  throw new apiError(400, "Invalid payment id");
+}
+
+  // Find our payment record
+ const payment = await Payment.findById(id);
+
+  if (!payment) {
+    throw new apiError(
+      404,
+      "Payment record not found"
+    );
+  }
+  if (payment.orderId !== razorpay_order_id) {
+  throw new apiError(
+    400,
+    "Payment order does not match"
+  );
+}
+
+  // Customer ownership
+  if (
+    payment.customer.toString() !==
+    req.user._id.toString()
+  ) {
+    throw new apiError(
+      403,
+      "You are not allowed to verify this payment"
+    );
+  }
+
+  // Already completed
   if (payment.paymentStatus === "completed") {
-    throw new apiError(400, "Payment already completed");
+    throw new apiError(
+      400,
+      "Payment already completed"
+    );
   }
 
-  if (payment.paymentStatus === "refunded") {
-    throw new apiError(400, "Payment already refunded");
+  // Generate expected signature
+  const generatedSignature = crypto
+    .createHmac(
+      "sha256",
+      process.env.RAZORPAY_KEY_SECRET
+    )
+    .update(
+      `${razorpay_order_id}|${razorpay_payment_id}`
+    )
+    .digest("hex");
+
+  // Compare signatures
+  if (generatedSignature !== razorpay_signature) {
+    throw new apiError(
+      400,
+      "Invalid payment signature"
+    );
   }
 
-  if (payment.paymentStatus === "cancelled") {
-    throw new apiError(400, "Payment was cancelled");
-  }
+  // Payment verified
+ const session = await mongoose.startSession();
 
-  if (!transactionId?.trim()) {
-    throw new apiError(400, "Transaction id is required");
-  }
+try {
+  session.startTransaction();
 
-  // Update payment
   payment.paymentStatus = "completed";
-  payment.transactionId = transactionId;
+  payment.transactionId = razorpay_payment_id;
 
-  await payment.save();
+  await payment.save({ session });
 
-  // Update booking
-  await Booking.findByIdAndUpdate(
+  const booking = await Booking.findByIdAndUpdate(
     payment.booking,
     {
       paymentStatus: "completed",
@@ -157,10 +241,19 @@ const paymentSuccess = asyncHandler(async (req, res) => {
     },
     {
       new: true,
+      session,
     }
   );
 
-  const updatedPayment = await Payment.findById(payment._id)
+  if (!booking) {
+    throw new apiError(404, "Booking not found");
+  }
+
+  await session.commitTransaction();
+
+  const updatedPayment = await Payment.findById(
+    payment._id
+  )
     .populate("booking")
     .populate("customer", "fullName email")
     .populate("provider", "businessName");
@@ -169,7 +262,79 @@ const paymentSuccess = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       updatedPayment,
-      "Payment completed successfully"
+      "Payment verified successfully"
+    )
+  );
+
+} catch (error) {
+
+  await session.abortTransaction();
+  throw error;
+
+} finally {
+
+  await session.endSession();
+
+}
+});
+
+const markPaymentFailed = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    throw new apiError(401, "Unauthorized request");
+  }
+
+  const { id } = req.params;
+  const { razorpay_order_id, reason } = req.body || {};
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid payment id");
+  }
+
+  if (!razorpay_order_id) {
+    throw new apiError(400, "Razorpay order id is required");
+  }
+
+  const payment = await Payment.findById(id);
+
+  if (!payment) {
+    throw new apiError(404, "Payment record not found");
+  }
+
+  if (
+    payment.customer.toString() !==
+    req.user._id.toString()
+  ) {
+    throw new apiError(
+      403,
+      "You are not allowed to update this payment"
+    );
+  }
+
+  if (payment.orderId !== razorpay_order_id) {
+    throw new apiError(
+      400,
+      "Payment order does not match"
+    );
+  }
+
+  if (payment.paymentStatus === "completed") {
+    throw new apiError(
+      400,
+      "Completed payment cannot be marked as failed"
+    );
+  }
+
+  payment.paymentStatus = "failed";
+  payment.failureReason =
+    reason || "Payment failed";
+
+  await payment.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      payment,
+      "Payment marked as failed"
     )
   );
 });
@@ -254,7 +419,8 @@ const getPaymentById = asyncHandler(async (req, res) => {
 
 export {
   createPayment,
-  paymentSuccess,
+  verifyPayment,
+  markPaymentFailed,
   getMyPayments,
   getPaymentById,
 };

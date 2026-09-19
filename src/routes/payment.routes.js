@@ -3,7 +3,8 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 import {
   createPayment,
-  paymentSuccess,
+  verifyPayment,
+  markPaymentFailed,
   getMyPayments,
   getPaymentById,
 } from "../controllers/payment.controller.js";
@@ -20,7 +21,10 @@ router.route("/my-payments")
 router.route("/:id")
   .get(verifyJWT, getPaymentById);
 
-router.route("/:id/success")
-  .patch(verifyJWT, paymentSuccess);
+router.route("/:id/verify")    // payment id 
+  .patch(verifyJWT, verifyPayment);
+
+router.route("/:id/failed")
+  .patch(verifyJWT, markPaymentFailed);
 
 export default router;
