@@ -7,6 +7,7 @@ import {
   markPaymentFailed,
   getMyPayments,
   getPaymentById,
+  razorpayWebhook
 } from "../controllers/payment.controller.js";
 
 const router = Router();

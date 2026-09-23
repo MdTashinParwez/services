@@ -417,10 +417,130 @@ const getPaymentById = asyncHandler(async (req, res) => {
   );
 });
 
+const razorpayWebhook = asyncHandler(async (req, res) => {
+  const webhookSignature = req.headers["x-razorpay-signature"];
+
+  if (!webhookSignature) {
+    throw new apiError(400, "Webhook signature missing");
+  }
+
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    throw new apiError(500, "Razorpay webhook secret is not configured");
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", webhookSecret)
+    .update(req.body)
+    .digest("hex");
+
+  if (expectedSignature !== webhookSignature) {
+    throw new apiError(400, "Invalid webhook signature");
+  }
+
+  const event = JSON.parse(req.body.toString());
+
+  switch (event.event) {
+    case "payment.captured": {
+      const paymentEntity = event.payload.payment.entity;
+
+      const razorpayPaymentId = paymentEntity.id;
+      const razorpayOrderId = paymentEntity.order_id;
+
+      const payment = await Payment.findOne({
+        orderId: razorpayOrderId,
+      });
+
+      if (!payment) {
+        return res.status(200).json(
+          new ApiResponse(
+            200,
+            null,
+            "Payment record not found, webhook acknowledged"
+          )
+        );
+      }
+
+      if (payment.paymentStatus === "completed") {
+        return res.status(200).json(
+          new ApiResponse(
+            200,
+            payment,
+            "Payment already processed"
+          )
+        );
+      }
+
+      const session = await mongoose.startSession();
+
+      try {
+        session.startTransaction();
+
+        payment.paymentStatus = "completed";
+        payment.transactionId = razorpayPaymentId;
+
+        await payment.save({ session });
+
+        await Booking.findByIdAndUpdate(
+          payment.booking,
+          {
+            paymentStatus: "completed",
+            paymentId: payment._id,
+          },
+          {
+            session,
+          }
+        );
+
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+
+      break;
+    }
+
+    case "payment.failed": {
+      const paymentEntity = event.payload.payment.entity;
+
+      const payment = await Payment.findOne({
+        orderId: paymentEntity.order_id,
+      });
+
+      if (payment && payment.paymentStatus !== "completed") {
+        payment.paymentStatus = "failed";
+        payment.failureReason =
+          paymentEntity.error_description || "Payment failed";
+
+        await payment.save();
+      }
+
+      break;
+    }
+
+    default:
+      // Other Razorpay events are acknowledged
+      break;
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      null,
+      "Webhook processed successfully"
+    )
+  );
+});
+
 export {
   createPayment,
   verifyPayment,
   markPaymentFailed,
   getMyPayments,
   getPaymentById,
+  razorpayWebhook
 };
