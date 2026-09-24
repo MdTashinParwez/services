@@ -1,13 +1,7 @@
 import { Worker } from "bullmq";
-
 import sendEmail from "../utils/sendEmail.js";
-
-import {
-    welcomeEmail,
-} from "../emails/auth/authEmail.js";
-
+import {welcomeEmail,} from "../emails/auth/authEmail.js";
 import { Booking } from "../models/booking.model.js";
-
 import {
     bookingCreatedEmail,
     bookingAcceptedEmail,
@@ -15,7 +9,14 @@ import {
     bookingCancelledEmail,
     bookingCompletedEmail,
 } from "../emails/booking/bookingEmails.js";
+import IORedis from "ioredis";
 
+const redisConnection = new IORedis(
+  process.env.REDIS_URL || "redis://localhost:6379",
+  {
+    maxRetriesPerRequest: null,
+  }
+);
 
 const notificationWorker = new Worker(
 
@@ -255,10 +256,7 @@ const notificationWorker = new Worker(
     },
 
     {
-        connection: {
-            host: "localhost",
-            port: 6379,
-        },
+         connection: redisConnection,
     }
 );
 
