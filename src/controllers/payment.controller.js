@@ -195,13 +195,6 @@ const verifyPayment = asyncHandler(async (req, res) => {
     );
   }
 
-  // Already completed
-  if (payment.paymentStatus === "completed") {
-    throw new apiError(
-      400,
-      "Payment already completed"
-    );
-  }
 
   // Generate expected signature
   const generatedSignature = crypto
@@ -221,6 +214,18 @@ const verifyPayment = asyncHandler(async (req, res) => {
       "Invalid payment signature"
     );
   }
+
+    // Already completed
+  if (payment.paymentStatus === "completed") {
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        payment,
+        "Payment already verified"
+      )
+    );
+  }
+
 
   // Payment verified
  const session = await mongoose.startSession();
