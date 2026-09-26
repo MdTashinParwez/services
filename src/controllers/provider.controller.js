@@ -250,18 +250,6 @@ const getProviderById = asyncHandler(async (req,res) => {
 
 
  }) 
- //  Future Improvement:
-// Create separate public provider response.
-// Never expose documents, earnings, or internal provider data in public APIs.
-// Use .select() to whitelist fields returned to clients.
-
-// TODO:
-// Support multiple document uploads
-// Replace single-file multer config with upload.fields()
-// Add document type validation
-// Allow document replacement/removal
-
-
 
 const getAllProviders = asyncHandler(async(req,res)=>{
 

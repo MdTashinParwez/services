@@ -15,12 +15,12 @@ import {
   validateCreateService,
   validateUpdateService,
 } from "../validators/service.validator.js";
-
+import { authorizeRoles } from "../middlewares/role.middleware.js";
 
 const router = Router();
 
 router.route("/")
-.post( verifyJWT,upload.fields([
+.post( verifyJWT,authorizeRoles("provider"),upload.fields([
     {
       name: "images",
       maxCount: 5,
@@ -30,18 +30,18 @@ router.route("/")
 
 router.route("/all").get(getAllServices)
 
-router.route("/my-services").get( verifyJWT, getMyService);
+router.route("/my-services").get( verifyJWT,authorizeRoles("provider"), getMyService);
 
 router.route("/:id").get(getServiceById);
 
 router.route("/:id").patch(
-  verifyJWT, upload.fields([
+  verifyJWT,authorizeRoles("provider"), upload.fields([
     {
       name: "images",
       maxCount: 5,
     },
   ]), validate(validateUpdateService), updateService
 );
-router.route("/:id").delete(verifyJWT,deleteService);
+router.route("/:id").delete(verifyJWT,authorizeRoles("provider"),deleteService);
 
 export default router;
