@@ -302,17 +302,274 @@ const getServiceById = asyncHandler(async(req,res)=>{
 
 })
 
+// const getAllServices = asyncHandler(async (req, res) => {
+//   const page = Math.max(parseInt(req.query.page) || 1, 1);
+//   const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+//   const search = req.query.search || "";
+
+//   const skip = (page - 1) * limit;
+
+
+//  const cacheKey = `services:page:${page}:limit:${limit}:search:${search}`;
+
+//   // Check Redis cache
+//   let cachedServices = null;
+
+//   try {
+//     cachedServices = await redisClient.get(cacheKey);
+//   } catch (error) {
+//     console.error("Redis cache read failed:", error);
+//   }
+
+//   if (cachedServices) {
+
+
+//     return res.status(200).json(
+//       new ApiResponse(
+//         200,
+//         JSON.parse(cachedServices),
+//         "Services fetched successfully"
+//       )
+//     );
+//   }
+
+//   // cache miss
+
+//   const query = {
+//     isActive: true,
+//   };
+
+//   // Search by title or description
+//   if (search) {
+//     query.$or = [
+//       {
+//         title: {
+//           $regex: search,
+//           $options: "i",
+//         },
+//       },
+//       {
+//         description: {
+//           $regex: search,
+//           $options: "i",
+//         },
+//       },
+//     ];
+//   }
+
+//   const totalServices = await Service.countDocuments(query);
+
+//   const services = await Service.find(query)
+//     .populate("provider", "businessName isVerified")
+//     .populate("category", "name slug")
+//     .sort({ createdAt: -1 })
+//     .skip(skip)
+//     .limit(limit);
+
+//   const totalPages = Math.ceil(totalServices / limit);
+
+//     const responseData = {
+//     services,
+//     currentPage: page,
+//     totalPages,
+//     totalServices,
+//   };
+
+//   // Store result in Redis
+//   try {
+//     await redisClient.set(
+//       cacheKey,
+//       JSON.stringify(responseData),
+//       "EX",
+//          600,
+      
+//     );
+//   } catch (error) {
+//     console.error("Redis cache write failed:", error);
+//   }
+
+//   return res.status(200).json(
+//     new ApiResponse(
+//       200,
+//       responseData,
+//       "Services fetched successfully"
+//     )
+//   );
+// });
+
 const getAllServices = asyncHandler(async (req, res) => {
   const page = Math.max(parseInt(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
-  const search = req.query.search || "";
+
+  const limit = Math.min(
+    Math.max(parseInt(req.query.limit) || 10, 1),
+    20
+  );
+
+  const {
+    search = "",
+    category = "",
+    serviceType = "",
+    city = "",
+    minPrice,
+    maxPrice,
+    sort = "newest",
+  } = req.query;
 
   const skip = (page - 1) * limit;
 
+  // Validate serviceType
+  const allowedServiceTypes = ["online", "onsite", "hybrid"];
 
- const cacheKey = `services:page:${page}:limit:${limit}:search:${search}`;
+  if (
+    serviceType &&
+    !allowedServiceTypes.includes(serviceType.toLowerCase())
+  ) {
+    throw new apiError(400, "Invalid service type");
+  }
 
-  // Check Redis cache
+  // Validate price
+  const parsedMinPrice =
+    minPrice !== undefined ? Number(minPrice) : undefined;
+
+  const parsedMaxPrice =
+    maxPrice !== undefined ? Number(maxPrice) : undefined;
+
+  if (
+    (minPrice !== undefined && !Number.isFinite(parsedMinPrice)) ||
+    (maxPrice !== undefined && !Number.isFinite(parsedMaxPrice))
+  ) {
+    throw new apiError(400, "Invalid price value");
+  }
+
+  if (
+    parsedMinPrice !== undefined &&
+    parsedMinPrice < 0
+  ) {
+    throw new apiError(400, "Minimum price cannot be negative");
+  }
+
+  if (
+    parsedMaxPrice !== undefined &&
+    parsedMaxPrice < 0
+  ) {
+    throw new apiError(400, "Maximum price cannot be negative");
+  }
+
+  if (
+    parsedMinPrice !== undefined &&
+    parsedMaxPrice !== undefined &&
+    parsedMinPrice > parsedMaxPrice
+  ) {
+    throw new apiError(
+      400,
+      "Minimum price cannot be greater than maximum price"
+    );
+  }
+
+  // Validate sort
+  const allowedSorts = {
+    newest: { createdAt: -1 },
+    oldest: { createdAt: 1 },
+    price_asc: { price: 1 },
+    price_desc: { price: -1 },
+    rating: { rating: -1, reviewCount: -1 },
+  };
+
+  if (!allowedSorts[sort]) {
+    throw new apiError(400, "Invalid sort option");
+  }
+  // Resolve category slug
+  let categoryId = null;
+
+  if (category) {
+    const categoryDoc = await Category.findOne({
+      slug: category.toLowerCase(),
+      isActive: true,
+    }).select("_id");
+
+    if (!categoryDoc) {
+      throw new apiError(404, "Category not found");
+    }
+
+    categoryId = categoryDoc._id;
+  }
+
+  // Build query
+  const query = {
+    isActive: true,
+  };
+
+  // Search
+  if (search.trim()) {
+    query.$or = [
+      {
+        title: {
+          $regex: search.trim(),
+          $options: "i",
+        },
+      },
+      {
+        description: {
+          $regex: search.trim(),
+          $options: "i",
+        },
+      },
+      {
+        tags: {
+          $regex: search.trim(),
+          $options: "i",
+        },
+      },
+    ];
+  }
+
+  // Category
+  if (categoryId) {
+    query.category = categoryId;
+  }
+
+  // Service type
+  if (serviceType) {
+    query.serviceType = serviceType.toLowerCase();
+  }
+
+  // City
+  if (city.trim()) {
+    query["location.city"] = {
+      $regex: `^${city.trim()}$`,
+      $options: "i",
+    };
+  }
+
+  // Price range
+  if (
+    parsedMinPrice !== undefined ||
+    parsedMaxPrice !== undefined
+  ) {
+    query.price = {};
+
+    if (parsedMinPrice !== undefined) {
+      query.price.$gte = parsedMinPrice;
+    }
+
+    if (parsedMaxPrice !== undefined) {
+      query.price.$lte = parsedMaxPrice;
+    }
+  }
+
+  // Redis cache
+  const cacheKey = [
+    "services",
+    `page:${page}`,
+    `limit:${limit}`,
+    `search:${search.trim().toLowerCase()}`,
+    `category:${category.toLowerCase()}`,
+    `serviceType:${serviceType.toLowerCase()}`,
+    `city:${city.trim().toLowerCase()}`,
+    `minPrice:${parsedMinPrice ?? ""}`,
+    `maxPrice:${parsedMaxPrice ?? ""}`,
+    `sort:${sort}`,
+  ].join(":");
   let cachedServices = null;
 
   try {
@@ -322,8 +579,6 @@ const getAllServices = asyncHandler(async (req, res) => {
   }
 
   if (cachedServices) {
-
-
     return res.status(200).json(
       new ApiResponse(
         200,
@@ -333,56 +588,35 @@ const getAllServices = asyncHandler(async (req, res) => {
     );
   }
 
-  // cache miss
+  // DB query
+  const [totalServices, services] = await Promise.all([
+    Service.countDocuments(query),
 
-  const query = {
-    isActive: true,
-  };
-
-  // Search by title or description
-  if (search) {
-    query.$or = [
-      {
-        title: {
-          $regex: search,
-          $options: "i",
-        },
-      },
-      {
-        description: {
-          $regex: search,
-          $options: "i",
-        },
-      },
-    ];
-  }
-
-  const totalServices = await Service.countDocuments(query);
-
-  const services = await Service.find(query)
-    .populate("provider", "businessName isVerified")
-    .populate("category", "name slug")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
+    Service.find(query)
+      .populate("provider", "businessName isVerified")
+      .populate("category", "name slug")
+      .sort(allowedSorts[sort])
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+  ]);
 
   const totalPages = Math.ceil(totalServices / limit);
 
-    const responseData = {
+  const responseData = {
     services,
     currentPage: page,
     totalPages,
     totalServices,
   };
 
-  // Store result in Redis
+
   try {
     await redisClient.set(
       cacheKey,
       JSON.stringify(responseData),
       "EX",
-         600,
-      
+      600
     );
   } catch (error) {
     console.error("Redis cache write failed:", error);
@@ -396,7 +630,6 @@ const getAllServices = asyncHandler(async (req, res) => {
     )
   );
 });
-
 const deleteService = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
@@ -446,9 +679,7 @@ const deleteService = asyncHandler(async (req, res) => {
       "Service deleted successfully"
     )
   );
-});   // improvement sofDelete , MongoDB Transaction // image clean // bookin check
-
-
+});  
 export{
   createService,
   updateService,

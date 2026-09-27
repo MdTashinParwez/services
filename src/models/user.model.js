@@ -45,8 +45,25 @@ const userSchema = new Schema(
     },
     refreshToken: {
       type: String,
-      select: false, // Don't return refresh token by default
+      select: false, 
     },
+
+
+    // resetPasswordOtp: {
+    //   type: String,
+    //   select: false,
+    // },
+
+    // resetPasswordOtpExpiresAt: {
+    //   type: Date,
+    //   select: false,
+    // },
+
+    // resetPasswordOtpAttempts: {
+    //   type: Number,
+    //   default: 0,
+    //   select: false,
+    // },
    
     // resetPasswordToken: String,
     // resetPasswordExpire: Date,
