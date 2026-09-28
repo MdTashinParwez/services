@@ -269,7 +269,7 @@ const getMyService = asyncHandler(async (req,res) => {
 )
 )
 
-})   // improvement pagination 
+})    
 
 const getServiceById = asyncHandler(async(req,res)=>{
    const {id} = req.params
@@ -301,101 +301,6 @@ const getServiceById = asyncHandler(async(req,res)=>{
   
 
 })
-
-// const getAllServices = asyncHandler(async (req, res) => {
-//   const page = Math.max(parseInt(req.query.page) || 1, 1);
-//   const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
-//   const search = req.query.search || "";
-
-//   const skip = (page - 1) * limit;
-
-
-//  const cacheKey = `services:page:${page}:limit:${limit}:search:${search}`;
-
-//   // Check Redis cache
-//   let cachedServices = null;
-
-//   try {
-//     cachedServices = await redisClient.get(cacheKey);
-//   } catch (error) {
-//     console.error("Redis cache read failed:", error);
-//   }
-
-//   if (cachedServices) {
-
-
-//     return res.status(200).json(
-//       new ApiResponse(
-//         200,
-//         JSON.parse(cachedServices),
-//         "Services fetched successfully"
-//       )
-//     );
-//   }
-
-//   // cache miss
-
-//   const query = {
-//     isActive: true,
-//   };
-
-//   // Search by title or description
-//   if (search) {
-//     query.$or = [
-//       {
-//         title: {
-//           $regex: search,
-//           $options: "i",
-//         },
-//       },
-//       {
-//         description: {
-//           $regex: search,
-//           $options: "i",
-//         },
-//       },
-//     ];
-//   }
-
-//   const totalServices = await Service.countDocuments(query);
-
-//   const services = await Service.find(query)
-//     .populate("provider", "businessName isVerified")
-//     .populate("category", "name slug")
-//     .sort({ createdAt: -1 })
-//     .skip(skip)
-//     .limit(limit);
-
-//   const totalPages = Math.ceil(totalServices / limit);
-
-//     const responseData = {
-//     services,
-//     currentPage: page,
-//     totalPages,
-//     totalServices,
-//   };
-
-//   // Store result in Redis
-//   try {
-//     await redisClient.set(
-//       cacheKey,
-//       JSON.stringify(responseData),
-//       "EX",
-//          600,
-      
-//     );
-//   } catch (error) {
-//     console.error("Redis cache write failed:", error);
-//   }
-
-//   return res.status(200).json(
-//     new ApiResponse(
-//       200,
-//       responseData,
-//       "Services fetched successfully"
-//     )
-//   );
-// });
 
 const getAllServices = asyncHandler(async (req, res) => {
   const page = Math.max(parseInt(req.query.page) || 1, 1);
@@ -630,6 +535,138 @@ const getAllServices = asyncHandler(async (req, res) => {
     )
   );
 });
+
+const getNearbyServices = asyncHandler(async (req, res) => {
+  const longitude = Number(req.query.longitude);
+  const latitude = Number(req.query.latitude);
+  const radius = Number(req.query.radius) || 10;
+
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    throw new apiError(
+      400,
+      "Valid longitude and latitude are required"
+    );
+  }
+
+  if (longitude < -180 || longitude > 180) {
+    throw new apiError(400, "Invalid longitude");
+  }
+
+  if (latitude < -90 || latitude > 90) {
+    throw new apiError(400, "Invalid latitude");
+  }
+
+  if (!Number.isFinite(radius) || radius <= 0 || radius > 100) {
+    throw new apiError(
+      400,
+      "Radius must be between 1 and 100 km"
+    );
+  }
+
+  const radiusInMeters = radius * 1000;
+
+  const services = await Service.aggregate([
+    {
+      $geoNear: {
+        near: {
+          type: "Point",
+          coordinates: [longitude, latitude],
+        },
+        key: "location",
+        distanceField: "distanceInMeters",
+        maxDistance: radiusInMeters,
+        spherical: true,
+        query: {
+          isActive: true,
+        },
+      },
+    },
+
+    {
+      $sort: {
+        distanceInMeters: 1,
+      },
+    },
+
+    {
+      $limit: 20,
+    },
+
+    {
+      $lookup: {
+        from: "providers",
+        localField: "provider",
+        foreignField: "_id",
+        as: "provider",
+      },
+    },
+
+    {
+      $unwind: "$provider",
+    },
+
+    {
+      $lookup: {
+        from: "categories",
+        localField: "category",
+        foreignField: "_id",
+        as: "category",
+      },
+    },
+
+    {
+      $unwind: "$category",
+    },
+
+    {
+      $addFields: {
+        distanceInKm: {
+          $round: [
+            { $divide: ["$distanceInMeters", 1000] },
+            2,
+          ],
+        },
+      },
+    },
+
+    {
+      $project: {
+        title: 1,
+        description: 1,
+        price: 1,
+        currency: 1,
+        images: 1,
+        duration: 1,
+        serviceType: 1,
+        rating: 1,
+        reviewCount: 1,
+        bookingCount: 1,
+        location: 1,
+        distanceInKm: 1,
+
+        "provider._id": 1,
+        "provider.businessName": 1,
+        "provider.isVerified": 1,
+
+        "category._id": 1,
+        "category.name": 1,
+        "category.slug": 1,
+      },
+    },
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        services,
+        count: services.length,
+        radius,
+      },
+      "Nearby services fetched successfully"
+    )
+  );
+});
 const deleteService = asyncHandler(async (req, res) => {
   if (!req.user?._id) {
     throw new apiError(401, "Unauthorized request");
@@ -680,11 +717,13 @@ const deleteService = asyncHandler(async (req, res) => {
     )
   );
 });  
+
 export{
   createService,
   updateService,
   getMyService,
   getServiceById,
   getAllServices,
+  getNearbyServices,
   deleteService
 }
