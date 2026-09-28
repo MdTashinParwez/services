@@ -82,4 +82,25 @@ const serviceSchema = new Schema(
   { timestamps: true }
 );
 
+// creted 
+serviceSchema.index({ isActive: 1, createdAt: -1 });
+
+serviceSchema.index({
+  isActive: 1,
+  category: 1,
+  createdAt: -1,
+});
+
+serviceSchema.index({
+  isActive: 1,
+  serviceType: 1,
+  createdAt: -1,
+});
+
+serviceSchema.index({
+  isActive: 1,
+  price: 1,
+});
+serviceSchema.index({ location: "2dsphere" });
+
 export const Service = mongoose.model('Service', serviceSchema);

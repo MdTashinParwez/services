@@ -8,6 +8,7 @@ import {
   getMyService,
   getAllServices,
   getServiceById,
+  getNearbyServices
 } from "../controllers/service.controller.js";
 import { validate } from "../middlewares/validation.middleware.js";
 
@@ -29,6 +30,7 @@ router.route("/")
 );
 
 router.route("/all").get(getAllServices)
+router.route("/nearby").get(getNearbyServices);
 
 router.route("/my-services").get( verifyJWT,authorizeRoles("provider"), getMyService);
 
@@ -43,5 +45,4 @@ router.route("/:id").patch(
   ]), validate(validateUpdateService), updateService
 );
 router.route("/:id").delete(verifyJWT,authorizeRoles("provider"),deleteService);
-
 export default router;
