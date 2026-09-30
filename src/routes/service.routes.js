@@ -30,7 +30,7 @@ router.route("/")
 );
 
 router.route("/all").get(getAllServices)
-router.route("/nearby").get(getNearbyServices);
+router.route("/nearby").get(getNearbyServices); 
 
 router.route("/my-services").get( verifyJWT,authorizeRoles("provider"), getMyService);
 
