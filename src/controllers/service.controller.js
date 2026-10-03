@@ -285,7 +285,7 @@ const getServiceById = asyncHandler(async(req,res)=>{
      match:{
         isApproved:true,    // improve use aggrigaiton 
     }
-  }).populate("category","name sulg")
+  }).populate("category","name slug")
 
 
   if(!service){

@@ -231,26 +231,30 @@ const getcurrentProvider = asyncHandler(async(req,res)=>{
 
 })
 
-const getProviderById = asyncHandler(async (req,res) => {
-  const {id} = req.params;
+const getProviderById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-    if (!mongoose.isValidObjectId(id)) {
-    throw new apiError(400, 'Invalid provider Id');
+  if (!mongoose.isValidObjectId(id)) {
+    throw new apiError(400, "Invalid provider Id");
   }
 
-  const provider = await Provider.findById(id).populate("businessCategory").select(
-    "businessName businessDescription businessCategory isVerified averageRating totalReviews responseTime"
-  );
-  if(!provider){
-    throw new apiError(404,"Provider not found")
+  const provider = await Provider.findOne({
+    _id: id,
+    isApproved: true,
+  })
+    .populate("businessCategory", "name slug")
+    .select(
+      "businessName businessDescription businessCategory isVerified averageRating totalReviews totalBookings completedBookings responseTime"
+    );
+
+  if (!provider) {
+    throw new apiError(404, "Provider not found");
   }
+
   return res
-  .status(200)
-  .json(new ApiResponse(200,provider,"Provider fetched successfully"))
-
-
- }) 
-
+    .status(200)
+    .json(new ApiResponse(200, provider, "Provider fetched successfully"));
+});
 const getAllProviders = asyncHandler(async(req,res)=>{
 
       const page = Math.max(parseInt(req.query.page) || 1,1);
@@ -318,9 +322,9 @@ const getProviderStatus = asyncHandler(async (req, res) => {
     "businessName businessCategory isVerified isApproved createdAt"
   );
 
-  if (!provider) {
-    throw new apiError(404, "Provider not found");
-  }
+  // if (!provider) {
+  //   throw new apiError(404, "Provider not found");
+  // }
 
   return res.status(200).json(
     new ApiResponse(
