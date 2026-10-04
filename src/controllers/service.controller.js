@@ -484,6 +484,9 @@ const getAllServices = asyncHandler(async (req, res) => {
   }
 
   if (cachedServices) {
+
+    console.log("CACHE HIT:", cacheKey);
+
     return res.status(200).json(
       new ApiResponse(
         200,
@@ -527,6 +530,7 @@ const getAllServices = asyncHandler(async (req, res) => {
     console.error("Redis cache write failed:", error);
   }
 
+    console.log("CACHE MISS:", cacheKey);
   return res.status(200).json(
     new ApiResponse(
       200,
