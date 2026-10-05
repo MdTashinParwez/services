@@ -476,12 +476,12 @@ const getAllServices = asyncHandler(async (req, res) => {
     `sort:${sort}`,
   ].join(":");
   let cachedServices = null;
-  // BENCHMARK: Redis BYPASS for testing
-  // try {
-  //   cachedServices = await redisClient.get(cacheKey);
-  // } catch (error) {
-  //   console.error("Redis cache read failed:", error);
-  // }
+
+  try {
+    cachedServices = await redisClient.get(cacheKey);
+  } catch (error) {
+    console.error("Redis cache read failed:", error);
+  }
 
   if (cachedServices) {
 
@@ -519,16 +519,16 @@ const getAllServices = asyncHandler(async (req, res) => {
   };
 
 
-  // try {
-  //   await redisClient.set(
-  //     cacheKey,
-  //     JSON.stringify(responseData),
-  //     "EX",
-  //     600
-  //   );
-  // } catch (error) {
-  //   console.error("Redis cache write failed:", error);
-  // }
+  try {
+    await redisClient.set(
+      cacheKey,
+      JSON.stringify(responseData),
+      "EX",
+      600
+    );
+  } catch (error) {
+    console.error("Redis cache write failed:", error);
+  }
 
     console.log("CACHE MISS:", cacheKey);
   return res.status(200).json(
