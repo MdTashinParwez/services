@@ -42,7 +42,7 @@ import categoryRouter from "./routes/category.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import healthRouter from "./routes/health.routes.js"; // redis health
 import providerAvailabilityRouter from "./routes/ProviderAvailability.routes.js";
-
+import adminRouter from "./routes/admin.routes.js";
 
 
 
@@ -57,6 +57,7 @@ app.use("/api/v1/categories",categoryRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/health", healthRouter); // redis health
 app.use("/api/v1/provider-availability", providerAvailabilityRouter); 
+app.use("/api/v1/admin", adminRouter); 
 
 
 
